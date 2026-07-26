@@ -206,6 +206,55 @@ subscribers already have.
 The cron trigger (`*/5 * * * *`) activates on deploy. It costs nothing when no
 calendar has push enabled — the query returns no rows and the tick exits.
 
+### Deploying on push (Workers Builds)
+
+Deploys are wired to the repository through **Workers Builds**, Cloudflare's own
+Git integration — no workflow file, no API token in GitHub. Everything lives in
+the dashboard under the Worker → **Settings → Build**, where the GitHub repo is
+connected. There is deliberately no `.github/workflows` here; adding one would
+mean two systems racing to deploy the same commit.
+
+| Field | Value |
+|---|---|
+| Build command | `pnpm install --frozen-lockfile && pnpm typecheck && pnpm test` |
+| Deploy command | `npx wrangler deploy` (the default) |
+| Non-production deploy command | `npx wrangler versions upload` (the default) |
+| Root directory | *(blank — not a monorepo)* |
+
+The build command is where the gate lives. Cloudflare runs it before the deploy
+command and a non-zero exit stops the build, so a failing typecheck or a red
+test suite never reaches production. That is the whole reason to put the checks
+there rather than trusting a green local run.
+
+Pushes to `main` deploy. Every other branch runs the **non-production** command,
+which uploads a version and gives it a preview URL without taking production
+traffic — so a pull request gets a real, reachable build of itself and the live
+Worker is untouched.
+
+#### Migrations stay manual, on purpose
+
+The API token Cloudflare generates for Workers Builds grants Workers Scripts,
+KV, R2, Workers Routes, and read on Account Settings — **not D1**. So
+`wrangler d1 migrations apply --remote` cannot run from a build with the default
+token, and a schema change has to be applied by hand *before* merging the code
+that depends on it:
+
+```bash
+pnpm db:migrate:remote
+```
+
+That ordering is not fussiness. An additive migration leaves the old code
+running against a schema with columns it ignores, which is harmless; new code
+against the old schema is an outage until someone notices. Migrating first, then
+merging, is the safe direction.
+
+To automate it anyway, create a token that also has **D1 → Edit**, set it under
+the Build settings' API token, and move migrations into the deploy command. The
+default token is chosen here because a deploy credential that cannot alter the
+database is a smaller thing to lose.
+
+Deploying by hand still works and is unchanged: `pnpm release`.
+
 ### Buffer OAuth
 
 Buffer requires a **public HTTPS redirect URI**, so this only works once
