@@ -17,6 +17,58 @@ Choosing `calendar.app.created` over `calendar` or `calendar.events` is what
 keeps us on the cheap side of that line, on top of being the right least
 privilege. Do not widen the scope casually — it changes the review category.
 
+## What you are actually asking for
+
+Not identity verification, and not a code audit. You are asking Google to let
+this app request a sensitive scope **from people who are not you**.
+
+Unverified, the app is capped at *Testing*: up to 100 named test users, a
+full-page "Google hasn't verified this app" warning before consent, and refresh
+tokens that die after 7 days. Verified, it moves to *In production*: anyone can
+connect, the warning goes away, and tokens stop expiring on a timer.
+
+So the review is Google satisfying itself of four things:
+
+1. **You control the domain** the app runs on and the policy is hosted at.
+2. **The app is what it says it is** — name and logo not impersonating anyone,
+   home page describing the actual product.
+3. **The scope is justified by real functionality** they can see working.
+4. **Your privacy policy discloses the data handling** and commits to Limited
+   Use.
+
+Everything below is in service of those four.
+
+## Where the settings actually live
+
+Google moved this out of "APIs & Services → OAuth consent screen" into a
+section called **Google Auth Platform**. Labels shift; the structure has been
+stable:
+
+| Tab | What is set there |
+| --- | --- |
+| **Branding** | App name, logo, home page, privacy policy URL, authorized domains, support email |
+| **Audience** | Testing vs Production, test users, and the **Publish app** button that starts verification |
+| **Clients** | The OAuth client ID and its redirect URIs |
+| **Data Access** | Which scopes are requested, and the justification for each |
+| **Verification Center** | Submission status, demo video, reviewer correspondence |
+
+Order that works, because later steps reject unless earlier ones are done:
+
+1. **Search Console first** — verify `bgreen.lol` at
+   `search.google.com/search-console`, signed in as the *same* Google account
+   that owns the Cloud project. Nothing else will accept the domain until this
+   exists.
+2. **Branding** — fill everything, including the authorized domain.
+3. **Data Access** — confirm `calendar.app.created` is listed, paste the
+   justification below.
+4. **Audience → Publish app** — flips Testing to "in production, pending
+   verification" and opens the request.
+5. **Verification Center** — attach the demo video, then wait. Expect
+   correspondence rather than a single verdict; reviewers routinely come back
+   once asking for a clearer video or a tightened justification.
+
+The app keeps working for test users throughout.
+
 ## What the reviewer checks
 
 | Requirement | Value |
