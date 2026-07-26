@@ -17,11 +17,11 @@ import { generateEncryptionKey, openSecret, sealSecret } from '../src/crypto.js'
 const CONFIG: BufferOAuthConfig = {
   clientId: 'client-abc',
   clientSecret: 'secret-xyz',
-  redirectUri: 'https://cally.bgreen.lol/auth/callback',
+  redirectUri: 'https://social-cally.bgreen.lol/auth/callback',
 };
 
 describe('bufferOAuthConfig', () => {
-  const base = { APP_BASE_URL: 'https://cally.bgreen.lol' } as never;
+  const base = { APP_BASE_URL: 'https://social-cally.bgreen.lol' } as never;
 
   it('is null without a client id, so the app falls back to API keys', () => {
     expect(bufferOAuthConfig({ ...(base as object) } as never)).toBeNull();
@@ -35,10 +35,10 @@ describe('bufferOAuthConfig', () => {
 
   it('derives the redirect from APP_BASE_URL and tolerates a trailing slash', () => {
     const config = bufferOAuthConfig({
-      APP_BASE_URL: 'https://cally.bgreen.lol/',
+      APP_BASE_URL: 'https://social-cally.bgreen.lol/',
       BUFFER_CLIENT_ID: 'abc',
     } as never);
-    expect(config!.redirectUri).toBe('https://cally.bgreen.lol/auth/callback');
+    expect(config!.redirectUri).toBe('https://social-cally.bgreen.lol/auth/callback');
   });
 });
 
@@ -227,7 +227,7 @@ describe('bufferTokenFor — refresh token rotation', () => {
         DB: db as never,
         FEED_CACHE: kv as never,
         ENCRYPTION_KEY: KEY,
-        APP_BASE_URL: 'https://cally.bgreen.lol',
+        APP_BASE_URL: 'https://social-cally.bgreen.lol',
         BUFFER_CLIENT_ID: 'client-abc',
         BUFFER_CLIENT_SECRET: 'secret-xyz',
       } as never,

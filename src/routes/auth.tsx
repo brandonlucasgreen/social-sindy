@@ -121,6 +121,21 @@ const ApiKeyForm = ({ labelled }: { labelled?: boolean }) => (
   </form>
 );
 
+/**
+ * Shown wherever the key field is, including behind the disclosure — a warning
+ * about pasting a credential is worth nothing if it is not next to the box the
+ * credential goes into.
+ */
+const ApiKeyWarning = () => (
+  <Notice>
+    <p>
+      <strong>Worth knowing before you paste:</strong> A Buffer API key grants full access to your
+      Buffer account, including publishing. This tool only ever reads, but a key is a broad
+      credential, so make sure to keep this API key safe.
+    </p>
+  </Notice>
+);
+
 function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
   return (
     <Layout title="social-cally — your Buffer queue in your calendar">
@@ -149,14 +164,18 @@ function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
           <details style="margin-top:1.5rem">
             <summary>Use an API key instead</summary>
             <p class="small" style="margin-top:0.75rem">
-              Only needed if signing in does not work for you. A key grants full account access,
-              including publishing, so signing in above is the safer route.
+              Only needed if signing in does not work for you — signing in above is the safer
+              route.
             </p>
             <ApiKeyForm />
+            <ApiKeyWarning />
           </details>
         </>
       ) : (
-        <ApiKeyForm labelled />
+        <>
+          <ApiKeyForm labelled />
+          <ApiKeyWarning />
+        </>
       )}
 
       <h2>What it can and cannot do</h2>
@@ -194,17 +213,6 @@ function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
         </div>
       </div>
 
-      {oauth ? null : (
-        <Notice>
-          <p>
-            <strong>Worth knowing before you paste it.</strong> A Buffer API key grants full access
-            to your Buffer account, including publishing. This tool only ever reads — but a key is a
-            broad credential, so handing one over is a real decision. This deployment has no Buffer
-            sign-in configured, which would let it ask for read-only access instead; until it does,
-            a key is the way in.
-          </p>
-        </Notice>
-      )}
     </Layout>
   );
 }

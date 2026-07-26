@@ -148,7 +148,7 @@ Be aware that declaring **any** route flips `workers_dev` to `false`, retiring t
 `*.workers.dev` origin. That is usually what you want — one hostname, one OAuth
 redirect URI — but it does mean the old URL stops answering. Set
 `workers_dev = true` explicitly to keep both. This deployment runs at
-[cally.bgreen.lol](https://cally.bgreen.lol).
+[social-cally.bgreen.lol](https://social-cally.bgreen.lol).
 
 **5. Set `APP_BASE_URL`** in `wrangler.toml` to that exact origin and deploy
 again. It is what the feed URLs and OAuth redirect are built from, so a mismatch
