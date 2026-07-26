@@ -130,6 +130,21 @@ privacyRoutes.get('/privacy', (c) =>
           a calendar from your account is not a decision this tool makes for you.
         </li>
       </ul>
+      <p>
+        social-cally's use and transfer of information received from Google APIs to any other app
+        will adhere to the{' '}
+        <a
+          href="https://developers.google.com/terms/api-services-user-data-policy"
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          Google API Services User Data Policy
+        </a>
+        , including the Limited Use requirements. Data from Google is used only to create and
+        maintain the calendar you asked for. It is never sold, never transferred to anyone except
+        as needed to provide that feature, never used for advertising, and never read by a human
+        except with your explicit permission or where required by law.
+      </p>
 
       <h2>Who else sees your data</h2>
       <ul>
