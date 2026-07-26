@@ -127,16 +127,34 @@ token. The real secrets go through `wrangler secret put` and never appear here.
 npx wrangler secret put ENCRYPTION_KEY
 ```
 
-**4. Deploy once to learn your origin.** Cloudflare assigns
-`https://social-cally.<your-subdomain>.workers.dev` (this deployment: `social-cally.brandonlucasgreen.workers.dev`):
+**4. Deploy once to learn your origin.**
 
 ```bash
 pnpm db:migrate:remote && pnpm release
 ```
 
+Out of the box Cloudflare assigns `https://social-cally.<your-subdomain>.workers.dev`.
+To serve from your own hostname instead, put its zone on Cloudflare and declare a
+Custom Domain in `wrangler.toml` — Cloudflare then creates the proxied DNS record
+and provisions the certificate for you:
+
+```toml
+[[routes]]
+pattern = "cally.example.com"
+custom_domain = true
+```
+
+Be aware that declaring **any** route flips `workers_dev` to `false`, retiring the
+`*.workers.dev` origin. That is usually what you want — one hostname, one OAuth
+redirect URI — but it does mean the old URL stops answering. Set
+`workers_dev = true` explicitly to keep both. This deployment runs at
+[cally.bgreen.lol](https://cally.bgreen.lol).
+
 **5. Set `APP_BASE_URL`** in `wrangler.toml` to that exact origin and deploy
 again. It is what the feed URLs and OAuth redirect are built from, so a mismatch
-breaks both.
+breaks both. Note that ICS UIDs are *not* derived from it — they carry a fixed
+`@social-cally` namespace — so changing hosts later will not orphan events that
+subscribers already have.
 
 The cron trigger (`*/5 * * * *`) activates on deploy. It costs nothing when no
 calendar has push enabled — the query returns no rows and the tick exits.
@@ -147,7 +165,7 @@ Buffer requires a **public HTTPS redirect URI**, so this only works once
 deployed. Register a client under Buffer → Settings → API with:
 
 ```
-https://social-cally.brandonlucasgreen.workers.dev/auth/callback
+https://<your-origin>/auth/callback
 ```
 
 A Worker can hold a secret, so register a **confidential** client and keep PKCE
@@ -165,7 +183,7 @@ Skip this and the ICS feed still works; the push UI simply stays hidden.
    *Testing*, add yourself as a test user; publishing it for other people
    requires Google verification.
 3. Create an **OAuth client ID** of type *Web application* with redirect URI
-   `https://social-cally.brandonlucasgreen.workers.dev/google/callback`.
+   `https://<your-origin>/google/callback`.
 4. Put the client ID in `wrangler.toml` under `[vars]` as `GOOGLE_CLIENT_ID`, and
    set the secret:
 
