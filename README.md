@@ -55,22 +55,46 @@ Buffer **does** support OAuth — authorization code + PKCE against
 `auth.buffer.com/auth` and `/token`. Its published docs are thin (the OAuth guide
 404s), which is easy to mistake for the feature not existing; it exists.
 
-Two things to know. OAuth requires a **public HTTPS redirect URI**, so it cannot
-be exercised from plain localhost — a Cloudflare `*.workers.dev` origin satisfies
-it for free. And Buffer **rotates the refresh token on every use**, so the newly
-returned one must always be persisted; in a server app hit concurrently, refreshes
-must be single-flighted or two of them will invalidate each other.
+OAuth requires a **public HTTPS redirect URI**, so it cannot be exercised from
+plain localhost — any deployed origin satisfies it. Scopes requested are
+`account:read`, `posts:read`, `offline_access`: read-only, because the app never
+publishes.
 
-Until this deployment registers a client, users paste a personal API key from
-[Buffer → Settings → API](https://publish.buffer.com/settings/api). Connecting the
-key is also how a user signs in.
+### The refresh token rotates, and that is a race
 
-That key grants full access to its owner's Buffer account, including publishing —
-which is why OAuth is worth moving to, since it can request read-only scopes. The
-key is validated against the API, sealed with AES-256-GCM under `ENCRYPTION_KEY`
-before it reaches the database, and never logged or returned in a response body.
-Swapping in OAuth replaces `src/routes/auth.tsx` without touching
-the rest of the app: everything downstream needs only a user and a credential.
+Buffer issues a **new refresh token on every refresh and invalidates the old
+one**. Persisting what comes back is necessary but not sufficient: the cron tick
+and a browser request can refresh the same user simultaneously, both spend token
+A, and whichever lands second gets `invalid_grant`. Handled naively that logs out
+a user whose grant is perfectly healthy.
+
+`src/buffer/token.ts` uses two mechanisms, because neither works alone:
+
+- a **KV lock**, which narrows the window but is advisory only — KV has no
+  compare-and-set, so it cannot actually exclude; and
+- on `invalid_grant`, **re-reading the row from D1** — strongly consistent,
+  unlike KV — and retrying if `updated_at` moved, meaning another in-flight
+  refresh already stored a newer token.
+
+The second is what makes it correct. A transient 5xx is deliberately *not*
+treated as a rotation conflict, so it fails fast instead of retrying.
+
+### Two credential kinds
+
+Either way the result downstream is identical — a user row plus a credential —
+and every caller resolves through `bufferTokenFor`, so the ICS feed, the setup UI
+and the cron share one path and a rotation persisted by any is seen by the rest.
+
+**OAuth** is the primary route wherever `BUFFER_CLIENT_ID` is set. Only the
+refresh token is persisted, sealed with AES-256-GCM under `ENCRYPTION_KEY`;
+access tokens live in KV under their own expiry and never reach the database.
+
+**A pasted personal API key** remains as the fallback when no client is
+registered, and keeps working for accounts that already use one. It grants full
+account access including publishing, which is exactly why OAuth is preferred —
+connecting via OAuth deletes any stored key rather than leaving a full-access
+credential at rest. Keys are validated against the API before storage, sealed the
+same way, and never logged or returned in a response body.
 
 ## Local development
 

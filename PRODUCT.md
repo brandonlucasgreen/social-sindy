@@ -49,10 +49,13 @@ each with different refresh behaviour that the product has to account for.
 - Buffer's public GraphQL API (`api.buffer.com`). Rate limits are scoped per
   credential and small — as few as 100 requests/15 min, 250/24 h, 3,000/30 days —
   which dictates aggressive caching throughout.
-- Buffer OAuth (authorization code + PKCE) requires a public HTTPS redirect URI,
-  so OAuth only works once hosted. Pasting a personal API key is the interim.
-- Planned Google Calendar push requests only the `calendar.app.created` scope, so
-  the tool can never see calendars it did not create.
+- Buffer OAuth (authorization code + PKCE) is live and is the primary way in,
+  requesting read-only scopes. It requires a public HTTPS redirect URI, so it
+  cannot be exercised from localhost. Pasting a personal API key remains the
+  fallback, and grants far more access than the tool needs.
+- The Google Calendar push requests only the `calendar.app.created` scope, so the
+  tool can never see calendars it did not create. It stays hidden unless both
+  Google credentials are configured.
 - Cloudflare Workers, D1, and KV. Server-rendered pages, no client-side
   framework.
 - Feed URLs must be unauthenticated, because calendar clients cannot send
