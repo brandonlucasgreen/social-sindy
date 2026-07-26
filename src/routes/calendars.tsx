@@ -41,8 +41,17 @@ const DURATION_OPTIONS = [
   [60, '1 hour'],
 ] as const;
 
+/**
+ * This is the feed's cache window as well as the interval advertised to
+ * clients, so it caps Buffer fetches at one per interval per calendar.
+ *
+ * A 15-minute option used to exist and was removed: 96 fetches a day is ~2,880
+ * a month, and Buffer allows as few as 250/24h and 3,000/30 days, so a single
+ * calendar on that setting nearly exhausted the monthly budget and two blew it.
+ * Hourly is the fastest interval that stays safe at a realistic number of
+ * calendars.
+ */
 const REFRESH_OPTIONS = [
-  [15, 'Every 15 minutes'],
   [60, 'Every hour'],
   [360, 'Every 6 hours'],
   [1440, 'Once a day'],
@@ -240,7 +249,7 @@ const SettingsFields: FC<{ settings: CalendarSettings }> = ({ settings }) => (
       <Select
         name="refreshMinutes"
         label="Refresh interval"
-        hint="Honoured by Apple Calendar. Google polls on its own schedule."
+        hint="Apple Calendar and Outlook honour this. Google Calendar ignores it and refetches on its own schedule, usually every 8 to 24 hours."
         options={REFRESH_OPTIONS}
         value={settings.refreshMinutes}
       />

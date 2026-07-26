@@ -52,7 +52,13 @@ BUFFER_CLIENT_ID = "qkC-8N5SSTdhBBd2VNs78ddc1H0aLswbe9TR6UZA6D_"
 
 # Google OAuth client ID for the optional Calendar push. Leave unset to run
 # without it — the ICS feed works regardless and the push UI is hidden.
-GOOGLE_CLIENT_ID = "1004282263775-u921e08c0ghjhbt203ev0umvogvk9n4c.apps.googleusercontent.com"
+# Unset until Google OAuth verification clears. Until then the consent screen is
+# in Testing, where Google expires refresh tokens after 7 days — the push would
+# break weekly for anyone who enabled it. With this unset, googleConfig() returns
+# null, the push UI is hidden, /google/* returns 501, and the cron finds no
+# calendars with push_enabled. The code stays; paste the line back to re-enable.
+# See docs/google-verification.md.
+# GOOGLE_CLIENT_ID = "1004282263775-u921e08c0ghjhbt203ev0umvogvk9n4c.apps.googleusercontent.com"
 
 # Secrets (set with `wrangler secret put <NAME>`, never committed):
 #   ENCRYPTION_KEY       - base64 32-byte AES-256-GCM key, wraps stored credentials
