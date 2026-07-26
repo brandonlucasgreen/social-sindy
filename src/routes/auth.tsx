@@ -91,7 +91,7 @@ const HeroDemo = () => (
       ))}
     </div>
     <figcaption class="small" style="margin-top:0.75rem">
-      Example of the result. Each scheduled post becomes an event, coloured by network.
+      Example of the result. Each scheduled post becomes an event, colored by network.
     </figcaption>
   </figure>
 );

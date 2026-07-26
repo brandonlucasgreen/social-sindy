@@ -249,7 +249,7 @@ const SettingsFields: FC<{ settings: CalendarSettings }> = ({ settings }) => (
       <Select
         name="refreshMinutes"
         label="Refresh interval"
-        hint="Apple Calendar and Outlook honour this. Google Calendar ignores it and refetches on its own schedule, usually every 8 to 24 hours."
+        hint="Apple Calendar and Outlook will follow this refresh rate. Google Calendar may refresh less frequently, typically every 8-24 hours."
         options={REFRESH_OPTIONS}
         value={settings.refreshMinutes}
       />
@@ -624,13 +624,12 @@ calendarRoutes.get('/calendars/:id', async (c) => {
 
       <Notice>
         <p>
-          <strong>How quickly it updates.</strong> Apple Calendar and Outlook honour the refresh
-          interval you chose ({calendar.refresh_minutes >= 60
+          <strong>How quickly it updates.</strong> Apple Calendar and Outlook will follow the
+          refresh rate you chose ({calendar.refresh_minutes >= 60
             ? `${Math.round(calendar.refresh_minutes / 60)}h`
             : `${calendar.refresh_minutes}m`}
-          ). Google Calendar ignores it and re-fetches subscribed URLs on its own schedule —
-          typically every 8–24 hours, with no way to force it sooner. If you need changes in Google
-          within minutes, an ICS subscription cannot do it.
+          ). Google Calendar may refresh less frequently, typically every 8-24 hours, and does not
+          offer a way to refresh on demand.
         </p>
       </Notice>
 
