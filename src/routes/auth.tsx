@@ -72,8 +72,8 @@ const HeroDemo = () => (
 
 function ConnectPage({ error }: { error?: string }) {
   return (
-    <Layout title="buffer-cally — your Buffer queue in your calendar">
-      <h1>Your posting queue, in the calendar you actually check.</h1>
+    <Layout title="social-cally — your Buffer queue in your calendar">
+      <h1>Your content schedule, in the calendar you actually check.</h1>
       <p class="lede">
         Connect Buffer, choose your channels, and get a calendar you can subscribe to in Google
         Calendar, Apple Calendar, or Outlook.

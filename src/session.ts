@@ -12,7 +12,7 @@ import { openSecret } from './crypto.js';
 import { createSession, getCredential, getSessionUser, type UserRow } from './db.js';
 import type { Env } from './env.js';
 
-export const SESSION_COOKIE = 'bgcal_session';
+export const SESSION_COOKIE = 'socially_session';
 
 export interface AppBindings {
   Bindings: Env;

@@ -1,4 +1,4 @@
-# buffer-cally
+# social-cally
 
 Turns a Buffer publishing schedule into a calendar feed you can subscribe to in
 Google Calendar, Apple Calendar, or Outlook. Connect Buffer, pick an
@@ -107,7 +107,7 @@ npx wrangler login
 **2. Create the storage** and paste the returned IDs into `wrangler.toml`:
 
 ```bash
-npx wrangler d1 create buffer-cally && npx wrangler kv namespace create FEED_CACHE
+npx wrangler d1 create social-cally && npx wrangler kv namespace create FEED_CACHE
 ```
 
 If you lose that output, the IDs are not gone and the resources should not be
@@ -128,7 +128,7 @@ npx wrangler secret put ENCRYPTION_KEY
 ```
 
 **4. Deploy once to learn your origin.** Cloudflare assigns
-`https://buffer-cally.<your-subdomain>.workers.dev` (this deployment: `buffer-cally.brandonlucasgreen.workers.dev`):
+`https://social-cally.<your-subdomain>.workers.dev` (this deployment: `social-cally.brandonlucasgreen.workers.dev`):
 
 ```bash
 pnpm db:migrate:remote && pnpm release
@@ -147,7 +147,7 @@ Buffer requires a **public HTTPS redirect URI**, so this only works once
 deployed. Register a client under Buffer → Settings → API with:
 
 ```
-https://buffer-cally.brandonlucasgreen.workers.dev/auth/callback
+https://social-cally.brandonlucasgreen.workers.dev/auth/callback
 ```
 
 A Worker can hold a secret, so register a **confidential** client and keep PKCE
@@ -165,7 +165,7 @@ Skip this and the ICS feed still works; the push UI simply stays hidden.
    *Testing*, add yourself as a test user; publishing it for other people
    requires Google verification.
 3. Create an **OAuth client ID** of type *Web application* with redirect URI
-   `https://buffer-cally.brandonlucasgreen.workers.dev/google/callback`.
+   `https://social-cally.brandonlucasgreen.workers.dev/google/callback`.
 4. Put the client ID in `wrangler.toml` under `[vars]` as `GOOGLE_CLIENT_ID`, and
    set the secret:
 

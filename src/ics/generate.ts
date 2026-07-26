@@ -22,7 +22,7 @@ import { escapeText, formatDuration, formatUtc, LineWriter } from './serialize.j
 
 export type { ChannelRef };
 
-const PRODID = '-//buffer-cally//Buffer Publishing Schedule//EN';
+const PRODID = '-//social-cally//Buffer Publishing Schedule//EN';
 
 export interface FeedOptions {
   /** Namespaces event UIDs so two feeds never collide in one calendar client. */
@@ -68,7 +68,7 @@ export function generateIcs(
     const channel = resolveChannel(post, channels);
 
     writer.add('BEGIN', 'VEVENT');
-    writer.add('UID', `${post.id}.${options.calendarId}@buffer-cally`);
+    writer.add('UID', `${post.id}.${options.calendarId}@social-cally`);
     writer.add('DTSTAMP', stamp);
 
     // Buffer's own updatedAt, so a client can distinguish a genuine edit from

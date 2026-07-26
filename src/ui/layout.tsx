@@ -484,7 +484,7 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
         <header class="masthead">
           <a class="brand" href="/">
             <span class="brand-mark" aria-hidden="true" />
-            buffer-cally
+            social-cally
           </a>
           {user ? (
             <span class="who">

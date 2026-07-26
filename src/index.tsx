@@ -1,5 +1,5 @@
 /**
- * buffer-cally — turns a Buffer publishing schedule into a calendar.
+ * social-cally — turns a Buffer publishing schedule into a calendar.
  *
  * Route groups:
  *   /                   connect Buffer (also signs in)
@@ -70,7 +70,7 @@ app.route('/', googleRoutes);
 
 app.notFound((c) =>
   c.html(
-    <Layout title="Not found — buffer-cally" user={c.get('user')}>
+    <Layout title="Not found — social-cally" user={c.get('user')}>
       <h1>Not found</h1>
       <p>
         <a href="/">Back to the start</a>
@@ -85,7 +85,7 @@ app.onError((error, c) => {
   // already carry the right status, and must not be flattened into a 500.
   if (error instanceof HTTPException) {
     return c.html(
-      <Layout title="Request blocked — buffer-cally" user={c.get('user')}>
+      <Layout title="Request blocked — social-cally" user={c.get('user')}>
         <h1>Request blocked</h1>
         <Notice kind="error">
           {error.status === 403
@@ -105,7 +105,7 @@ app.onError((error, c) => {
   console.error('unhandled error', error);
 
   return c.html(
-    <Layout title="Something went wrong — buffer-cally" user={c.get('user')}>
+    <Layout title="Something went wrong — social-cally" user={c.get('user')}>
       <h1>Something went wrong</h1>
       <Notice kind="error">
         That request could not be completed. If it keeps happening, disconnect and reconnect your

@@ -325,7 +325,7 @@ calendarRoutes.get('/calendars', async (c) => {
   const calendars = await listCalendars(c.env.DB, user.id);
 
   return c.html(
-    <Layout title="Your calendars — buffer-cally" user={user}>
+    <Layout title="Your calendars — social-cally" user={user}>
       <h1>Your calendars</h1>
       <p class="lede">Each calendar is one subscribable feed of your Buffer schedule.</p>
 
@@ -406,7 +406,7 @@ function bufferErrorPage(c: AppContext, error: unknown) {
         : `Could not reach Buffer: ${(error as Error).message}`;
 
   return c.html(
-    <Layout title="Buffer unavailable — buffer-cally" user={user}>
+    <Layout title="Buffer unavailable — social-cally" user={user}>
       <h1>Buffer could not be reached</h1>
       <Notice kind="error">{message}</Notice>
       <div class="btn-row">
@@ -437,7 +437,7 @@ calendarRoutes.get('/calendars/new', async (c) => {
         return c.redirect(`/calendars/new?org=${account.organizations[0]!.id}`, 302);
       }
       return c.html(
-        <Layout title="Choose an organization — buffer-cally" user={user} narrow>
+        <Layout title="Choose an organization — social-cally" user={user} narrow>
           <Steps at={1} />
           <h1>Which Buffer organization?</h1>
           <p class="lede">Each calendar covers channels from a single organization.</p>
@@ -475,7 +475,7 @@ calendarRoutes.get('/calendars/new', async (c) => {
     };
 
     return c.html(
-      <Layout title="Choose channels — buffer-cally" user={user}>
+      <Layout title="Choose channels — social-cally" user={user}>
         <Steps at={2} />
         <h1>{organization.name}</h1>
         <p class="lede">Pick the channels whose posts should appear on the calendar.</p>
@@ -531,7 +531,7 @@ calendarRoutes.post('/calendars', async (c) => {
 
     if (!chosen.length) {
       return c.html(
-        <Layout title="Choose channels — buffer-cally" user={user}>
+        <Layout title="Choose channels — social-cally" user={user}>
           <h1>Pick at least one channel</h1>
           <Notice kind="error">A calendar needs at least one channel to show anything.</Notice>
           <a class="btn" href={`/calendars/new?org=${organizationId}`}>
@@ -582,7 +582,7 @@ calendarRoutes.get('/calendars/:id', async (c) => {
   const pushState = pushStatus(calendar);
 
   return c.html(
-    <Layout title={`${calendar.name} — buffer-cally`} user={user}>
+    <Layout title={`${calendar.name} — social-cally`} user={user}>
       <Steps at={3} />
       <h1>{calendar.name}</h1>
       <p class="lede">
@@ -769,7 +769,7 @@ calendarRoutes.get('/calendars/:id/edit', async (c) => {
     };
 
     return c.html(
-      <Layout title={`Edit ${calendar.name} — buffer-cally`} user={user}>
+      <Layout title={`Edit ${calendar.name} — social-cally`} user={user}>
         <h1>Edit calendar</h1>
         <p class="lede">{calendar.organization_name}</p>
 

@@ -22,10 +22,10 @@ const LAST_UPDATED = '26 July 2026';
 
 privacyRoutes.get('/privacy', (c) =>
   c.html(
-    <Layout title="Privacy policy — buffer-cally" user={c.get('user')} narrow>
+    <Layout title="Privacy policy — social-cally" user={c.get('user')} narrow>
       <h1>Privacy policy</h1>
       <p class="lede">
-        What buffer-cally stores, why, for how long, and who else sees it. Last updated{' '}
+        What social-cally stores, why, for how long, and who else sees it. Last updated{' '}
         {LAST_UPDATED}.
       </p>
 
@@ -40,7 +40,7 @@ privacyRoutes.get('/privacy', (c) =>
 
       <h2>Who runs this</h2>
       <p>
-        buffer-cally is an independent tool. It is not made by, affiliated with, or endorsed by
+        social-cally is an independent tool. It is not made by, affiliated with, or endorsed by
         Buffer or Google. This deployment is operated by <strong>[operator name]</strong>, who is
         responsible for the data described below. Questions go to{' '}
         <strong>[contact email]</strong>.

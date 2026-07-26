@@ -65,7 +65,7 @@ each with different refresh behaviour that the product has to account for.
 
 ## Brand Commitments
 
-Named buffer-cally. Deliberately **brand-adjacent and clearly third-party**: it may
+Named social-cally. Deliberately **brand-adjacent and clearly third-party**: it may
 use Buffer's colour, type, shape, and shadow language so it feels native to the
 ecosystem, but must not use the Buffer logo or wordmark, and must carry an honest
 signal that it is unofficial. A third-party tool that holds other people's OAuth
