@@ -26,6 +26,7 @@ import { privacyRoutes } from './routes/privacy.jsx';
 import { withUser, type AppBindings } from './session.js';
 import { pushCalendar } from './sync/push.js';
 import { Layout, Notice } from './ui/layout.jsx';
+import { MARK_SVG } from './ui/mark.jsx';
 
 const app = new Hono<AppBindings>();
 
@@ -55,6 +56,18 @@ app.on(['GET', 'HEAD'], '/feed/:file', async (c) => {
 });
 
 app.get('/healthz', (c) => c.text('ok'));
+
+/**
+ * Favicon. Registered above the CSRF and session middleware because it is a
+ * public static asset — a browser fetches it without a session, and there is
+ * nothing here worth a cookie lookup.
+ */
+app.get('/icon.svg', (c) =>
+  c.body(MARK_SVG, 200, {
+    'content-type': 'image/svg+xml; charset=utf-8',
+    'cache-control': 'public, max-age=86400',
+  }),
+);
 
 /**
  * Rejects cross-origin form posts. Calendar feeds are read-only GETs, so this

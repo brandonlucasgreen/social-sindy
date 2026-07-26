@@ -25,6 +25,8 @@
 
 import type { FC, PropsWithChildren } from 'hono/jsx';
 
+import { Mark } from './mark.jsx';
+
 const STYLES = `
 :root {
   color-scheme: light dark;
@@ -111,18 +113,9 @@ body {
   font-weight: 600; font-size: 1.0625rem; letter-spacing: -0.01em;
   color: var(--text); text-decoration: none;
 }
-/* Our own mark, deliberately not Buffer's: three stacked bars becoming a date. */
-.brand-mark {
-  width: 1.5rem; height: 1.5rem; border-radius: 0.4375rem; flex: none;
-  background: var(--accent); position: relative; overflow: hidden;
-}
-.brand-mark::before,
-.brand-mark::after {
-  content: ''; position: absolute; left: 0.3125rem; right: 0.3125rem; height: 0.1875rem;
-  border-radius: 1px; background: hsl(217 33% 17%);
-}
-.brand-mark::before { top: 0.4375rem; }
-.brand-mark::after { top: 0.8125rem; opacity: 0.45; }
+/* Our own mark, deliberately not Buffer's. Drawn in src/ui/mark.tsx. */
+.brand-mark { display: block; width: 1.5rem; height: 1.5rem; flex: none; }
+.brand-mark svg { display: block; width: 100%; height: 100%; }
 
 .who { display: flex; align-items: center; gap: 0.75rem; font-size: 0.875rem; color: var(--text-dim); }
 .who form { display: contents; }
@@ -468,6 +461,7 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <meta name="robots" content="noindex" />
       <title>{title}</title>
+      <link rel="icon" href="/icon.svg" type="image/svg+xml" />
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
       <link
@@ -480,7 +474,7 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
       <div class={narrow ? 'wrap narrow' : 'wrap'}>
         <header class="masthead">
           <a class="brand" href="/">
-            <span class="brand-mark" aria-hidden="true" />
+            <Mark />
             social-cally
           </a>
           {user ? (
