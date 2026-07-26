@@ -44,7 +44,7 @@ BUFFER_CLIENT_ID = "qkC-8N5SSTdhBBd2VNs78ddc1H0aLswbe9TR6UZA6D_"
 
 # Google OAuth client ID for the optional Calendar push. Leave unset to run
 # without it — the ICS feed works regardless and the push UI is hidden.
-# GOOGLE_CLIENT_ID = ""
+GOOGLE_CLIENT_ID = "1004282263775-u921e08c0ghjhbt203ev0umvogvk9n4c.apps.googleusercontent.com"
 
 # Secrets (set with `wrangler secret put <NAME>`, never committed):
 #   ENCRYPTION_KEY       - base64 32-byte AES-256-GCM key, wraps stored credentials
