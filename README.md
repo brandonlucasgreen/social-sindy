@@ -168,8 +168,30 @@ deployed. Register a client under Buffer → Settings → API with:
 https://<your-origin>/auth/callback
 ```
 
-A Worker can hold a secret, so register a **confidential** client and keep PKCE
-as well. Remember that Buffer rotates the refresh token on every use — see
+Then set the client ID. It is **not a secret** — it travels in the redirect URL
+every user's browser follows — so it belongs in `wrangler.toml` under `[vars]`,
+in version control:
+
+```toml
+[vars]
+BUFFER_CLIENT_ID = "your-client-id"
+```
+
+The client *secret* is optional. Buffer accepts public clients on PKCE alone,
+but a Worker can hold a secret, so set one if your client is confidential:
+
+```bash
+npx wrangler secret put BUFFER_CLIENT_SECRET
+```
+
+Deploy after changing either. With no `BUFFER_CLIENT_ID` the connect page simply
+falls back to the pasted API key, so an unconfigured deployment still works.
+
+Scopes requested are `account:read`, `posts:read`, and `offline_access` —
+read-only, deliberately excluding the `posts:write` and `ideas:write` that
+Buffer's own clients ask for, because this tool never publishes.
+
+Remember that Buffer rotates the refresh token on every use — see
 [Authentication](#authentication).
 
 ### Enabling the Google push

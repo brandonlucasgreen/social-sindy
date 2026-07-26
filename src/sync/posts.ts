@@ -7,10 +7,10 @@
  * doubling would be material.
  */
 
-import { BufferAuthError, BufferClient, lowestRemaining } from '../buffer/client.js';
+import { BufferClient, lowestRemaining } from '../buffer/client.js';
+import { bufferTokenFor } from '../buffer/token.js';
 import type { BufferPost } from '../buffer/types.js';
-import { openSecret } from '../crypto.js';
-import { getCredential, parseStatuses, type CalendarWithChannels } from '../db.js';
+import { parseStatuses, type CalendarWithChannels } from '../db.js';
 import type { Env } from '../env.js';
 
 /** KV requires at least 60s for expirationTtl. */
@@ -53,16 +53,13 @@ export async function postsForCalendar(
   const hit = await env.FEED_CACHE.get(key, 'json');
   if (hit) return { bundle: hit as PostBundle, cached: true };
 
-  const credential = await getCredential(env.DB, calendar.user_id);
-  if (!credential) throw new BufferAuthError('No Buffer API key is stored for this calendar');
-
-  const apiKey = await openSecret(
-    { ciphertext: credential.ciphertext, iv: credential.iv },
-    env.ENCRYPTION_KEY,
-  );
+  // Resolves an OAuth access token or a stored API key, whichever this user
+  // connected with. On the cron path this is also where a rotated refresh token
+  // gets persisted, so it must run before the fetch, not alongside it.
+  const token = await bufferTokenFor(env, calendar.user_id);
 
   const { start, end } = windowFor(calendar, now);
-  const { posts, rateLimit, truncated } = await new BufferClient(apiKey).fetchPosts({
+  const { posts, rateLimit, truncated } = await new BufferClient(token).fetchPosts({
     organizationId: calendar.organization_id,
     channelIds: calendar.channels.map((channel) => channel.channel_id),
     statuses: parseStatuses(calendar.statuses),

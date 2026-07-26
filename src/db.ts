@@ -72,6 +72,15 @@ export interface GoogleCredentialRow {
   scope: string;
 }
 
+export interface BufferOAuthCredentialRow {
+  user_id: string;
+  ciphertext: string;
+  iv: string;
+  scope: string;
+  /** Moves on every rotation; the conflict signal for a concurrent refresh. */
+  updated_at: string;
+}
+
 const now = () => new Date().toISOString();
 
 /** Statuses are stored comma-separated; unknown values are dropped on read. */
@@ -175,10 +184,70 @@ export async function deleteUser(db: D1Database, userId: string): Promise<void> 
       .bind(userId),
     db.prepare('DELETE FROM calendars WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM credentials WHERE user_id = ?').bind(userId),
+    db.prepare('DELETE FROM buffer_oauth_credentials WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM google_credentials WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM users WHERE id = ?').bind(userId),
   ]);
+}
+
+// -- buffer oauth credentials -----------------------------------------------
+
+/**
+ * Stores or replaces the sealed Buffer refresh token.
+ *
+ * Called on every refresh, not just at connect time, because Buffer rotates the
+ * token on use. `updated_at` always moves so a concurrent refresher can tell
+ * that this row changed underneath it.
+ */
+export async function saveBufferOAuthCredential(
+  db: D1Database,
+  userId: string,
+  sealed: { ciphertext: string; iv: string },
+  details: { scope: string },
+): Promise<void> {
+  const timestamp = now();
+  await db
+    .prepare(
+      `INSERT INTO buffer_oauth_credentials (user_id, ciphertext, iv, scope, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         ciphertext = excluded.ciphertext,
+         iv = excluded.iv,
+         scope = excluded.scope,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(userId, sealed.ciphertext, sealed.iv, details.scope, timestamp, timestamp)
+    .run();
+}
+
+export function getBufferOAuthCredential(
+  db: D1Database,
+  userId: string,
+): Promise<BufferOAuthCredentialRow | null> {
+  return db
+    .prepare(
+      'SELECT user_id, ciphertext, iv, scope, updated_at FROM buffer_oauth_credentials WHERE user_id = ?',
+    )
+    .bind(userId)
+    .first<BufferOAuthCredentialRow>();
+}
+
+export async function deleteBufferOAuthCredential(
+  db: D1Database,
+  userId: string,
+): Promise<void> {
+  await db.prepare('DELETE FROM buffer_oauth_credentials WHERE user_id = ?').bind(userId).run();
+}
+
+/**
+ * Drops a stored personal API key.
+ *
+ * Used when a user upgrades to OAuth: leaving the key behind would keep a
+ * full-access credential at rest for an account that no longer needs one.
+ */
+export async function deleteCredential(db: D1Database, userId: string): Promise<void> {
+  await db.prepare('DELETE FROM credentials WHERE user_id = ?').bind(userId).run();
 }
 
 // -- google credentials -----------------------------------------------------

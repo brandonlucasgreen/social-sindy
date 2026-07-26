@@ -7,9 +7,9 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import type { Context, MiddlewareHandler } from 'hono';
 
 import { BufferClient } from './buffer/client.js';
+import { bufferTokenFor } from './buffer/token.js';
 import type { BufferAccount, BufferChannel } from './buffer/types.js';
-import { openSecret } from './crypto.js';
-import { createSession, getCredential, getSessionUser, type UserRow } from './db.js';
+import { createSession, getSessionUser, type UserRow } from './db.js';
 import type { Env } from './env.js';
 
 export const SESSION_COOKIE = 'socially_session';
@@ -60,16 +60,12 @@ export const requireUser: MiddlewareHandler<AppBindings> = async (c, next) => {
   await next();
 };
 
-/** Builds a Buffer client from the user's stored, encrypted API key. */
+/**
+ * Builds a Buffer client from whichever credential the user connected with —
+ * an OAuth access token, refreshed on demand, or a pasted personal API key.
+ */
 export async function clientForUser(env: Env, userId: string): Promise<BufferClient> {
-  const credential = await getCredential(env.DB, userId);
-  if (!credential) throw new Error('No Buffer API key is stored for this account');
-
-  const apiKey = await openSecret(
-    { ciphertext: credential.ciphertext, iv: credential.iv },
-    env.ENCRYPTION_KEY,
-  );
-  return new BufferClient(apiKey);
+  return new BufferClient(await bufferTokenFor(env, userId));
 }
 
 async function cached<T>(
