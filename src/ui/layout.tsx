@@ -498,11 +498,13 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
         {children}
         <footer class="site">
           <p>
-            An independent tool, not made by or affiliated with Buffer. It reads your posting
-            schedule and never publishes anything.
+            Made with love in Massachusetts, USA. An independent tool, not made by or affiliated
+            with Buffer. It reads your posting schedule and never publishes anything.
           </p>
           <p>
-            <a href="/privacy">Privacy policy</a>
+            <a href="/privacy">Privacy policy</a> &middot;{' '}
+            <a href="https://bgreen.lol">By @bgreenlol</a> &middot;{' '}
+            <a href="https://liberapay.com/brandonlucasgreen">Donate</a>
           </p>
         </footer>
       </div>
