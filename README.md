@@ -1,4 +1,4 @@
-# buffer-gcal
+# buffer-cal
 
 Turns a Buffer publishing schedule into a calendar feed you can subscribe to in
 Google Calendar, Apple Calendar, or Outlook. Connect Buffer, pick an
@@ -71,7 +71,7 @@ Create the D1 database and KV namespace, then put the returned IDs into
 `wrangler.toml` (it ships with `PLACEHOLDER_REPLACE_AFTER_CREATE`):
 
 ```bash
-npx wrangler d1 create buffer-gcal
+npx wrangler d1 create buffer-cal
 ```
 
 ```bash

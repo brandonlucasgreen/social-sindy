@@ -8,7 +8,7 @@
 import type { BufferPost } from '../buffer/types.js';
 import { escapeText, formatDuration, formatUtc, LineWriter } from './serialize.js';
 
-const PRODID = '-//buffer-gcal//Buffer Publishing Schedule//EN';
+const PRODID = '-//buffer-cal//Buffer Publishing Schedule//EN';
 
 /**
  * Deep link to a single post in Buffer's web app.
@@ -191,7 +191,7 @@ export function generateIcs(
     const end = new Date(start.getTime() + options.eventDurationMinutes * 60_000);
 
     writer.add('BEGIN', 'VEVENT');
-    writer.add('UID', `${post.id}.${options.calendarId}@buffer-gcal`);
+    writer.add('UID', `${post.id}.${options.calendarId}@buffer-cal`);
     writer.add('DTSTAMP', stamp);
 
     // Buffer's own updatedAt, so a client can distinguish a genuine edit from

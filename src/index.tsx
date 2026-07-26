@@ -1,5 +1,5 @@
 /**
- * buffer-gcal — turns a Buffer publishing schedule into a subscribable
+ * buffer-cal — turns a Buffer publishing schedule into a subscribable
  * iCalendar feed.
  *
  * Route groups:

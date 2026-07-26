@@ -1,4 +1,4 @@
-name = "buffer-gcal"
+name = "buffer-cal"
 main = "src/index.tsx"
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
@@ -11,7 +11,7 @@ id = "PLACEHOLDER_REPLACE_AFTER_CREATE"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "buffer-gcal"
+database_name = "buffer-cal"
 database_id = "PLACEHOLDER_REPLACE_AFTER_CREATE"
 
 [vars]
