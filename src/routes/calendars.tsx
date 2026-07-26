@@ -31,7 +31,12 @@ import {
 
 export const calendarRoutes = new Hono<AppBindings>();
 
-calendarRoutes.use('*', requireUser);
+// Scoped to this sub-app's own paths, not '*'. These routers are mounted at
+// '/', so a '*' guard would also run on paths nothing here serves — redirecting
+// logged-out visitors before app.notFound could fire, and turning every unknown
+// URL into a silent bounce to the homepage instead of a 404.
+calendarRoutes.use('/calendars', requireUser);
+calendarRoutes.use('/calendars/*', requireUser);
 
 // -- form option sets -------------------------------------------------------
 

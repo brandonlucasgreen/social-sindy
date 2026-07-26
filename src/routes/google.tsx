@@ -33,7 +33,10 @@ import { Layout, Notice } from '../ui/layout.jsx';
 
 export const googleRoutes = new Hono<AppBindings>();
 
-googleRoutes.use('*', requireUser);
+// Scoped rather than '*' — see the note in calendars.tsx. This router serves
+// two path families, so both are guarded explicitly.
+googleRoutes.use('/google/*', requireUser);
+googleRoutes.use('/calendars/:id/push/*', requireUser);
 
 /** OAuth state and PKCE verifier, held server-side for the round trip only. */
 const STATE_TTL_SECONDS = 600;
