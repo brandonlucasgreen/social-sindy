@@ -6,6 +6,7 @@ import {
   BUFFER_SCOPES,
   BufferOAuthError,
   createPkcePair,
+  describeAuthorizationError,
   exchangeCode,
   hasRequiredScopes,
   refreshAccessToken,
@@ -80,6 +81,37 @@ describe('createPkcePair', () => {
     const a = await createPkcePair();
     const b = await createPkcePair();
     expect(a.verifier).not.toBe(b.verifier);
+  });
+});
+
+describe('describeAuthorizationError', () => {
+  it('surfaces error_description, which is the only informative part', () => {
+    // Real example: Buffer blocks OAuth while a staff impersonation session is
+    // active. The code alone ("server_error") is unactionable.
+    expect(
+      describeAuthorizationError(
+        'server_error',
+        'You cannot sign in to the new authorization system while impersonating in the old authorization system. Please stop impersonation first.',
+      ),
+    ).toContain('stop impersonation first');
+  });
+
+  it('falls back to the code when no description is given', () => {
+    expect(describeAuthorizationError('server_error')).toContain('(server_error)');
+    expect(describeAuthorizationError('server_error', '   ')).toContain('(server_error)');
+    expect(describeAuthorizationError('server_error', null)).toContain('(server_error)');
+  });
+
+  it('never renders an empty reason', () => {
+    for (const [code, desc] of [['server_error', undefined], ['x', ''], ['y', null]] as const) {
+      expect(describeAuthorizationError(code, desc).trim()).not.toMatch(/[:(]\s*\)?$/);
+    }
+  });
+
+  it('keeps the plain-language message for a genuine refusal', () => {
+    expect(describeAuthorizationError('access_denied')).toBe(
+      'You declined the Buffer authorization, so nothing was connected.',
+    );
   });
 });
 

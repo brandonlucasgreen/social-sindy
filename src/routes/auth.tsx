@@ -23,6 +23,7 @@ import {
   authorizationUrl,
   BUFFER_SCOPES,
   createPkcePair,
+  describeAuthorizationError,
   exchangeCode,
   hasRequiredScopes,
   BufferOAuthError,
@@ -263,12 +264,7 @@ authRoutes.get('/auth/callback', async (c) => {
 
   const denied = c.req.query('error');
   if (denied) {
-    return connectFailed(
-      c,
-      denied === 'access_denied'
-        ? 'You declined the Buffer authorization, so nothing was connected.'
-        : `Buffer refused the authorization: ${denied}`,
-    );
+    return connectFailed(c, describeAuthorizationError(denied, c.req.query('error_description')));
   }
 
   const state = c.req.query('state');

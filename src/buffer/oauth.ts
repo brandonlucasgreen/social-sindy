@@ -184,6 +184,28 @@ export function refreshAccessToken(
 }
 
 /**
+ * Turns an OAuth error redirect into something a person can act on.
+ *
+ * `error` is a fixed machine code from a short list; `error_description` is
+ * where providers put the actual diagnosis, and it is frequently the only
+ * informative part. Buffer, for example, uses it to explain that an active
+ * staff impersonation session blocks sign-in — a cause no user would guess
+ * from the code alone. Prefer the description, fall back to the code, and
+ * never show nothing.
+ */
+export function describeAuthorizationError(
+  error: string,
+  description?: string | null,
+): string {
+  if (error === 'access_denied') {
+    return 'You declined the Buffer authorization, so nothing was connected.';
+  }
+
+  const detail = description?.trim();
+  return `Buffer refused the authorization${detail ? `: ${detail}` : ` (${error})`}`;
+}
+
+/**
  * True when the granted scopes cover what the calendar needs to read.
  *
  * **Absent means granted.** RFC 6749 §5.1 makes `scope` optional in a token
