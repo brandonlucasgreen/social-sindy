@@ -77,7 +77,13 @@ const MAX_ATTEMPTS = 4;
 export class GoogleCalendarClient {
   constructor(
     private readonly accessToken: string,
-    private readonly fetchImpl: typeof fetch = fetch,
+    /**
+     * Bound to `globalThis` for the same reason as in BufferClient: called as
+     * `this.fetchImpl(...)`, an unbound global `fetch` gets this client as its
+     * receiver and workerd throws "Illegal invocation". Node is lenient, so
+     * the tests cannot catch it. Do not remove the bind.
+     */
+    private readonly fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis),
     /** Injected so tests do not actually wait out the backoff. */
     private readonly sleep: (ms: number) => Promise<void> = (ms) =>
       new Promise((resolve) => setTimeout(resolve, ms)),

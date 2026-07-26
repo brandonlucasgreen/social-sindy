@@ -244,3 +244,42 @@ describe('BufferClient', () => {
     expect(result.posts).toEqual([]);
   });
 });
+
+/**
+ * Regression guard for a Cloudflare-only failure.
+ *
+ * Both API clients store `fetch` on the instance and call it as
+ * `this.fetchImpl(...)`, which gives the global function a client object as its
+ * receiver. workerd rejects that — "Illegal invocation: function called with
+ * incorrect `this` reference" — and it took down the very first real Buffer
+ * connect attempt. Node's fetch does not care about the receiver, so no
+ * behavioural test in this suite can reproduce it; asserting the bind survives
+ * is the only guard available from here.
+ */
+describe('fetch binding (Cloudflare illegal-invocation guard)', () => {
+  const defaultFetchOf = (instance: object) =>
+    (instance as unknown as { fetchImpl: typeof fetch }).fetchImpl;
+
+  it('BufferClient does not hold the raw global fetch', () => {
+    expect(defaultFetchOf(new BufferClient('k'))).not.toBe(globalThis.fetch);
+  });
+
+  it('GoogleCalendarClient does not hold the raw global fetch', async () => {
+    const { GoogleCalendarClient } = await import('../src/google/calendar.js');
+    expect(defaultFetchOf(new GoogleCalendarClient('token'))).not.toBe(globalThis.fetch);
+  });
+
+  it('still calls through to the real fetch', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      calls.push(String(url));
+      return new Response('{"data":{}}', { headers: { 'content-type': 'application/json' } });
+    });
+
+    // Constructed AFTER the stub, so the bound default wraps the stub.
+    await new BufferClient('k').getAccount().catch(() => undefined);
+
+    expect(calls).toHaveLength(1);
+    vi.unstubAllGlobals();
+  });
+});

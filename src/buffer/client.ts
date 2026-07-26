@@ -177,7 +177,16 @@ interface PostsPage {
 export class BufferClient {
   constructor(
     private readonly apiKey: string,
-    private readonly fetchImpl: typeof fetch = fetch,
+    /**
+     * Injectable for tests. Bound to `globalThis` because it is then called as
+     * `this.fetchImpl(...)`, which would otherwise invoke the global `fetch`
+     * with a BufferClient as its receiver — workerd rejects that outright with
+     * "Illegal invocation: function called with incorrect `this` reference".
+     *
+     * Node's fetch is lenient about the receiver, so this fails only on
+     * Cloudflare and never in the test suite. Do not "simplify" the bind away.
+     */
+    private readonly fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis),
   ) {}
 
   private async request<T>(
