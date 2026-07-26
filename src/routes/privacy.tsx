@@ -41,9 +41,9 @@ privacyRoutes.get('/privacy', (c) =>
       <h2>Who runs this</h2>
       <p>
         social-cally is an independent tool. It is not made by, affiliated with, or endorsed by
-        Buffer or Google. This deployment is operated by <strong>[operator name]</strong>, who is
-        responsible for the data described below. Questions go to{' '}
-        <strong>[contact email]</strong>.
+        Buffer or Google. This deployment is operated by <strong>Brandon Lucas Green</strong>, who
+        is responsible for the data described below. Questions go to{' '}
+        <a href="mailto:hi@bgreen.lol">hi@bgreen.lol</a>.
       </p>
 
       <h2>What it stores</h2>
