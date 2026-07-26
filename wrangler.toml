@@ -1,0 +1,23 @@
+name = "buffer-gcal"
+main = "src/index.tsx"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Feed responses are cached here so that repeated calendar-client polls do not
+# each spend a request against the user's Buffer rate-limit quota.
+[[kv_namespaces]]
+binding = "FEED_CACHE"
+id = "PLACEHOLDER_REPLACE_AFTER_CREATE"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "buffer-gcal"
+database_id = "PLACEHOLDER_REPLACE_AFTER_CREATE"
+
+[vars]
+# Public base URL, used to build the feed URLs shown to the user.
+APP_BASE_URL = "http://localhost:8787"
+
+# Secrets (set with `wrangler secret put <NAME>`, never committed):
+#   ENCRYPTION_KEY - base64 32-byte AES-256-GCM key, encrypts Buffer API keys at rest
+#   SESSION_SECRET - random string, signs session cookies
