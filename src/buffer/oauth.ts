@@ -15,6 +15,14 @@
  * invalidates the old one. Callers must persist what comes back. Two concurrent
  * refreshes will invalidate each other, which is why `token.ts` serialises them
  * and retries against the freshly stored token rather than giving up.
+ *
+ * THE RE-CONSENT TRAP: an authorization the user has already approved can come
+ * back WITHOUT a refresh token, because the server skips the approval screen it
+ * would have issued one from. Signing in a second time — a new device, a new
+ * browser — is what triggers it, so the first sign-in works and every one after
+ * it looks broken. `prompt=consent` asks for the screen back; the callback in
+ * `routes/auth.tsx` also falls back to the grant already on file, because the
+ * absence of a token in *this* response says nothing about the one we hold.
  */
 
 const AUTH_ENDPOINT = 'https://auth.buffer.com/auth';
@@ -71,11 +79,22 @@ export async function createPkcePair(): Promise<PkcePair> {
   return { verifier, challenge: base64url(new Uint8Array(digest)) };
 }
 
-/** Builds the consent URL the user is sent to. */
+/**
+ * Builds the consent URL the user is sent to.
+ *
+ * `forceConsent` adds `prompt=consent`, and it is not cosmetic. An
+ * authorization server that has already recorded this user's approval will
+ * happily skip the approval screen and hand back an access token with **no
+ * refresh token** — the grant is fine, but the response carries nothing
+ * durable. That turns "sign in again on a second device" into a hard failure
+ * for a background sync, which is precisely the trap `src/google/oauth.ts`
+ * already sidesteps. Re-prompting is the documented cure.
+ */
 export function authorizationUrl(
   config: BufferOAuthConfig,
   state: string,
   challenge: string,
+  { forceConsent = false }: { forceConsent?: boolean } = {},
 ): string {
   const params = new URLSearchParams({
     client_id: config.clientId,
@@ -87,7 +106,30 @@ export function authorizationUrl(
     code_challenge_method: 'S256',
   });
 
+  if (forceConsent) params.set('prompt', 'consent');
+
   return `${AUTH_ENDPOINT}?${params.toString()}`;
+}
+
+/**
+ * True when an error redirect looks like the authorization server objecting to
+ * `prompt` rather than to the user.
+ *
+ * This exists because `prompt` cannot be verified from here: OAuth needs a
+ * public HTTPS redirect, so the flow is unexercisable outside the deployed
+ * origin, and Buffer's OAuth guide 404s. `prompt` is standard (OIDC) and
+ * RFC 6749 §3.1 says unrecognised parameters are ignored, so the expected
+ * outcome is that it works or is dropped. If Buffer instead rejects the whole
+ * request, the caller retries once without it — the cost of being wrong about
+ * an untestable parameter should be one extra redirect, not a sign-in page
+ * nobody can get past.
+ *
+ * `invalid_request` is the code §4.1.2.1 reserves for a bad parameter. A
+ * description that names `prompt` counts whatever the code says, since servers
+ * are inconsistent about which one they pick.
+ */
+export function promptRejected(error: string, description?: string | null): boolean {
+  return error === 'invalid_request' || /\bprompt\b/i.test(description ?? '');
 }
 
 export interface BufferTokenResponse {

@@ -26,7 +26,9 @@ import {
   describeAuthorizationError,
   exchangeCode,
   hasRequiredScopes,
+  promptRejected,
   BufferOAuthError,
+  type BufferOAuthConfig,
 } from '../buffer/oauth.js';
 import { invalidateAccessToken } from '../buffer/token.js';
 import { fingerprintSecret, randomToken, sealSecret } from '../crypto.js';
@@ -34,6 +36,8 @@ import {
   deleteCredential,
   deleteSession,
   deleteUser,
+  getBufferOAuthCredential,
+  getUserByBufferAccountId,
   saveBufferOAuthCredential,
   saveCredential,
   upsertUser,
@@ -238,22 +242,55 @@ function connectFailed(
   return c.html(<ConnectPage error={message} oauth={bufferOAuthConfig(c.env) !== null} />, status);
 }
 
+/** What the round trip parks in KV, keyed by the `state` it hands the browser. */
+interface AuthState {
+  verifier: string;
+  /** Whether this attempt asked for `prompt=consent`, so a rejection is legible. */
+  forceConsent?: boolean;
+}
+
+/**
+ * Starts a round trip: PKCE pair, single-use state, consent URL.
+ *
+ * The verifier stays server-side. Putting it in a cookie would hand the PKCE
+ * secret to the very browser PKCE exists to distrust.
+ */
+async function beginAuthorization(
+  c: AppContext,
+  config: BufferOAuthConfig,
+  forceConsent: boolean,
+): Promise<string> {
+  const { verifier, challenge } = await createPkcePair();
+  const state = randomToken(24);
+
+  const record: AuthState = { verifier, forceConsent };
+  await c.env.FEED_CACHE.put(`bstate:${state}`, JSON.stringify(record), {
+    expirationTtl: STATE_TTL_SECONDS,
+  });
+
+  return authorizationUrl(config, state, challenge, { forceConsent });
+}
+
+/**
+ * Reads and destroys a state record.
+ *
+ * Consuming before use is what makes it single-shot, and single-shot is what
+ * stops a replayed callback from re-running the exchange.
+ */
+async function consumeState(c: AppContext, state: string | undefined): Promise<AuthState | null> {
+  if (!state) return null;
+  const stored = await c.env.FEED_CACHE.get(`bstate:${state}`, 'json');
+  await c.env.FEED_CACHE.delete(`bstate:${state}`);
+  return (stored as AuthState | null) ?? null;
+}
+
 authRoutes.get('/auth/buffer', async (c) => {
   const config = bufferOAuthConfig(c.env);
   if (!config) {
     return connectFailed(c, 'This deployment has no Buffer sign-in configured. Use an API key.', 501);
   }
 
-  const { verifier, challenge } = await createPkcePair();
-  const state = randomToken(24);
-
-  // The verifier stays server-side for the round trip. Putting it in a cookie
-  // would hand the PKCE secret to the very browser PKCE exists to distrust.
-  await c.env.FEED_CACHE.put(`bstate:${state}`, JSON.stringify({ verifier }), {
-    expirationTtl: STATE_TTL_SECONDS,
-  });
-
-  return c.redirect(authorizationUrl(config, state, challenge), 302);
+  return c.redirect(await beginAuthorization(c, config, true), 302);
 });
 
 authRoutes.get('/auth/callback', async (c) => {
@@ -264,24 +301,32 @@ authRoutes.get('/auth/callback', async (c) => {
 
   const denied = c.req.query('error');
   if (denied) {
-    return connectFailed(c, describeAuthorizationError(denied, c.req.query('error_description')));
+    const description = c.req.query('error_description');
+
+    // A server that will not take `prompt=consent` reports a malformed request,
+    // not a refusal — blaming the user for a parameter they never saw would be
+    // both wrong and unactionable. Retry once without it. The retry records
+    // `forceConsent: false`, so this cannot loop.
+    const attempt = await consumeState(c, c.req.query('state'));
+    if (attempt?.forceConsent && promptRejected(denied, description)) {
+      return c.redirect(await beginAuthorization(c, config, false), 302);
+    }
+
+    return connectFailed(c, describeAuthorizationError(denied, description));
   }
 
   const state = c.req.query('state');
   const code = c.req.query('code');
   if (!state || !code) return connectFailed(c, 'That sign-in link was incomplete. Try again.');
 
-  // Consuming the state before use makes it single-shot, which is what stops a
-  // replayed callback from re-running the exchange.
-  const stored = await c.env.FEED_CACHE.get(`bstate:${state}`, 'json');
-  await c.env.FEED_CACHE.delete(`bstate:${state}`);
+  const stored = await consumeState(c, state);
   if (!stored) {
     return connectFailed(c, 'That sign-in attempt expired or was already used. Try again.');
   }
 
   let tokens;
   try {
-    tokens = await exchangeCode(config, code, (stored as { verifier: string }).verifier);
+    tokens = await exchangeCode(config, code, stored.verifier);
   } catch (error) {
     const message =
       error instanceof BufferOAuthError ? error.message : `Could not reach Buffer: ${String(error)}`;
@@ -295,15 +340,9 @@ authRoutes.get('/auth/callback', async (c) => {
     );
   }
 
-  // Without a refresh token the calendar would stop updating within the hour,
-  // which is worse than refusing to connect.
-  if (!tokens.refreshToken) {
-    return connectFailed(
-      c,
-      'Buffer did not return a durable authorization, so the calendar could not be kept up to date. Try again, or use an API key.',
-    );
-  }
-
+  // Read the account before judging the grant. Whether this authorization is
+  // durable enough to sign in on depends on what is already stored for whoever
+  // just signed in, and until the account is known, that cannot be asked.
   let account;
   try {
     account = (await new BufferClient(tokens.accessToken).getAccount()).data;
@@ -314,6 +353,21 @@ authRoutes.get('/auth/callback', async (c) => {
     return connectFailed(c, `Buffer signed you in but the account could not be read: ${(error as Error).message}`, 502);
   }
 
+  // Buffer omits the refresh token when it skips an approval screen the user
+  // has already given — which is exactly what signing in on a second device
+  // looks like. The grant already on file is untouched by that and still keeps
+  // the calendar fresh, so this is an ordinary sign-in, not a failure. Only
+  // when there is nothing to fall back on is the authorization really unusable.
+  const existing = await getUserByBufferAccountId(c.env.DB, account.id);
+  const onFile = existing ? await getBufferOAuthCredential(c.env.DB, existing.id) : null;
+
+  if (!tokens.refreshToken && !onFile) {
+    return connectFailed(
+      c,
+      'Buffer signed you in but did not return a durable authorization, so the calendar could not be kept up to date. Revoke this app under your Buffer account settings and sign in again, or use an API key.',
+    );
+  }
+
   const user = await upsertUser(c.env.DB, {
     bufferAccountId: account.id,
     email: account.email,
@@ -321,20 +375,25 @@ authRoutes.get('/auth/callback', async (c) => {
     timezone: account.timezone ?? 'UTC',
   });
 
-  await saveBufferOAuthCredential(
-    c.env.DB,
-    user.id,
-    await sealSecret(tokens.refreshToken, c.env.ENCRYPTION_KEY),
-    // Record what we asked for when Buffer declines to say, so the stored row
-    // always describes the grant rather than holding an empty string.
-    { scope: tokens.scope ?? BUFFER_SCOPES.join(' ') },
-  );
+  // Only a token actually issued gets stored. Overwriting a live grant with
+  // nothing is how a working account becomes a locked-out one.
+  if (tokens.refreshToken) {
+    await saveBufferOAuthCredential(
+      c.env.DB,
+      user.id,
+      await sealSecret(tokens.refreshToken, c.env.ENCRYPTION_KEY),
+      // Record what we asked for when Buffer declines to say, so the stored row
+      // always describes the grant rather than holding an empty string.
+      { scope: tokens.scope ?? BUFFER_SCOPES.join(' ') },
+    );
 
-  // Upgrading from a pasted key: drop it rather than leaving a full-access
-  // credential at rest for an account that now has a read-only one.
-  await deleteCredential(c.env.DB, user.id);
+    // Upgrading from a pasted key: drop it rather than leaving a full-access
+    // credential at rest for an account that now has a read-only one.
+    await deleteCredential(c.env.DB, user.id);
 
-  await invalidateAccessToken(c.env, user.id);
+    await invalidateAccessToken(c.env, user.id);
+  }
+
   await invalidateLookups(
     c.env,
     user.id,
