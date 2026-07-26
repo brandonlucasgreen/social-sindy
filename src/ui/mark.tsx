@@ -20,7 +20,7 @@ const ACCENT = '#a8c7f0'; // hsl(214 70% 80%) — --accent
  * Standalone SVG document. `viewBox` is 32×32 so every coordinate lands on a
  * half-pixel at the 24px the masthead renders it at.
  */
-export const MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="social-cally">
+export const MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="social cally">
   <rect x="8.75" y="1.5" width="3.5" height="7" rx="1.75" fill="${NAVY}"/>
   <rect x="19.75" y="1.5" width="3.5" height="7" rx="1.75" fill="${NAVY}"/>
   <rect x="2" y="4.5" width="28" height="26" rx="7" fill="${ACCENT}"/>

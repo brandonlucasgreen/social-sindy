@@ -40,7 +40,7 @@ const STATE_TTL_SECONDS = 600;
 
 function notConfigured(c: AppContext) {
   return c.html(
-    <Layout title="Google push unavailable — social-cally" user={c.get('user')} narrow>
+    <Layout title="Google push unavailable — social cally" user={c.get('user')} narrow>
       <h1>Google push is not set up</h1>
       <Notice kind="error">
         This deployment has no Google OAuth client configured, so events cannot be written to Google
@@ -62,7 +62,7 @@ function pushError(c: AppContext, error: unknown) {
       : `Unexpected failure: ${(error as Error).message}`;
 
   return c.html(
-    <Layout title="Google sync failed — social-cally" user={c.get('user')} narrow>
+    <Layout title="Google sync failed — social cally" user={c.get('user')} narrow>
       <h1>That sync did not finish</h1>
       <Notice kind="error">{message}</Notice>
       <div class="btn-row">
@@ -106,7 +106,7 @@ googleRoutes.get('/google/callback', async (c) => {
 
   if (denied) {
     return c.html(
-      <Layout title="Google not connected — social-cally" user={user} narrow>
+      <Layout title="Google not connected — social cally" user={user} narrow>
         <h1>Google was not connected</h1>
         <Notice>You declined the permission request, so nothing changed.</Notice>
         <p>
@@ -126,7 +126,7 @@ googleRoutes.get('/google/callback', async (c) => {
   // either a stale tab or a forged callback. Neither should proceed.
   if (!stored || stored.userId !== user.id) {
     return c.html(
-      <Layout title="Google not connected — social-cally" user={user} narrow>
+      <Layout title="Google not connected — social cally" user={user} narrow>
         <h1>That sign-in link expired</h1>
         <Notice kind="error">
           The Google sign-in could not be verified. Please start the connection again.

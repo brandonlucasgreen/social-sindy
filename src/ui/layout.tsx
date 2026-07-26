@@ -473,10 +473,13 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
     <body>
       <div class={narrow ? 'wrap narrow' : 'wrap'}>
         <header class="masthead">
-          {/* Display only. The hyphenated `social-cally` remains the project's
-              identity everywhere it is load-bearing — package, Worker, D1
-              database, repo, and the ICS UID domain, which must never change
-              or every subscribed client deletes and recreates every event. */}
+          {/* The product is called "social cally" wherever a person reads it —
+              this wordmark, page titles, the privacy policy. The hyphenated
+              `social-cally` is kept everywhere it is load-bearing: the package,
+              Worker, D1 database, repo, and above all the ICS UID domain in
+              src/ics/generate.ts, where a change would make every subscribed
+              client delete and recreate every event. Renaming for consistency
+              is an obvious-looking cleanup with an expensive failure mode. */}
           <a class="brand" href="/">
             <Mark />
             social cally

@@ -22,10 +22,10 @@ const LAST_UPDATED = '26 July 2026';
 
 privacyRoutes.get('/privacy', (c) =>
   c.html(
-    <Layout title="Privacy policy — social-cally" user={c.get('user')} narrow>
+    <Layout title="Privacy policy — social cally" user={c.get('user')} narrow>
       <h1>Privacy policy</h1>
       <p class="lede">
-        What social-cally stores, why, for how long, and who else sees it. Last updated{' '}
+        What social cally stores, why, for how long, and who else sees it. Last updated{' '}
         {LAST_UPDATED}.
       </p>
 
@@ -40,7 +40,7 @@ privacyRoutes.get('/privacy', (c) =>
 
       <h2>Who runs this</h2>
       <p>
-        social-cally is an independent tool. It is not made by, affiliated with, or endorsed by
+        social cally is an independent tool. It is not made by, affiliated with, or endorsed by
         Buffer or Google. This deployment is operated by <strong>Brandon Lucas Green</strong>, who
         is responsible for the data described below. Questions go to{' '}
         <a href="mailto:hi@bgreen.lol">hi@bgreen.lol</a>.
@@ -131,7 +131,7 @@ privacyRoutes.get('/privacy', (c) =>
         </li>
       </ul>
       <p>
-        social-cally's use and transfer of information received from Google APIs to any other app
+        social cally's use and transfer of information received from Google APIs to any other app
         will adhere to the{' '}
         <a
           href="https://developers.google.com/terms/api-services-user-data-policy"

@@ -140,7 +140,7 @@ const ApiKeyWarning = () => (
 
 function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
   return (
-    <Layout title="social-cally — your Buffer queue in your calendar">
+    <Layout title="social cally — your Buffer queue in your calendar">
       <h1>Your content schedule, in the calendar you actually check.</h1>
       <p class="lede">
         Connect Buffer, choose your channels, and get a calendar you can subscribe to in Google
