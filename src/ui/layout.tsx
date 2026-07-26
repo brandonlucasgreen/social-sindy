@@ -499,16 +499,33 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
         <footer class="site">
           <p>
             Made with love in Massachusetts, USA. An independent tool, not made by or affiliated
-            with Buffer. It reads your posting schedule and never publishes anything.
+            with Buffer. It never posts on your behalf.
           </p>
           <p>
-            <a href="/privacy">Privacy policy</a> &middot;{' '}
-            <a href="https://bgreen.lol">By @bgreenlol</a> &middot;{' '}
-            <a href="https://liberapay.com/brandonlucasgreen">Donate</a>
+            <a href="https://bgreen.lol" target="_blank" rel="noopener noreferrer">
+              By @bgreenlol
+            </a>{' '}
+            &middot;{' '}
+            <a
+              href="https://liberapay.com/brandonlucasgreen"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Donate
+            </a>{' '}
+            &middot;{' '}
+            <a href="/privacy" target="_blank" rel="noopener noreferrer">
+              Privacy policy
+            </a>
           </p>
         </footer>
       </div>
       <script dangerouslySetInnerHTML={{ __html: COPY_SCRIPT }} />
+      <script
+        data-goatcounter="https://social-cally.goatcounter.com/count"
+        async
+        src="//gc.zgo.at/count.js"
+      />
     </body>
   </html>
 );
