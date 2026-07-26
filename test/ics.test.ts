@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BufferPost } from '../src/buffer/types.js';
-import { excerpt, generateIcs, type ChannelRef } from '../src/ics/generate.js';
+import { generateIcs, type ChannelRef } from '../src/ics/generate.js';
+import { excerpt } from '../src/present.js';
 import { escapeText, foldLine, formatDuration, formatUtc } from '../src/ics/serialize.js';
 
 const encoder = new TextEncoder();
