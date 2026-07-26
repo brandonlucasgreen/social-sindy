@@ -79,6 +79,29 @@ a user whose grant is perfectly healthy.
 The second is what makes it correct. A transient 5xx is deliberately *not*
 treated as a rotation conflict, so it fails fast instead of retrying.
 
+### Re-authorizing returns no refresh token
+
+An authorization the user has already approved comes back **without a refresh
+token**, because the server skips the approval screen it would have issued one
+from. The grant is fine; the response simply carries nothing durable. This only
+bites on the *second* sign-in — a new device, a new browser, a cleared cookie —
+so the flow looks healthy right up until someone tries it twice.
+
+Two things stop it, in `src/buffer/oauth.ts` and `src/routes/auth.tsx`:
+
+- the sign-in link sends **`prompt=consent`**, asking for the approval screen
+  back. Google's client already did this; Buffer's did not; and
+- a token response with no refresh token **falls back to the grant already on
+  file**. The absence of a token in *this* response says nothing about the one
+  in the database, and that stored token is still rotating happily. Only when
+  there is nothing to fall back on is the sign-in genuinely refused — and it
+  never overwrites a live grant with nothing.
+
+`prompt` cannot be exercised outside the deployed origin, so if Buffer rejects
+the parameter the callback retries once without it (`promptRejected`). The cost
+of being wrong about it is one extra redirect, not a sign-in page nobody can get
+past.
+
 ### Two credential kinds
 
 Either way the result downstream is identical — a user row plus a credential —

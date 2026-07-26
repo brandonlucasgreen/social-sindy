@@ -9,6 +9,7 @@ import {
   describeAuthorizationError,
   exchangeCode,
   hasRequiredScopes,
+  promptRejected,
   refreshAccessToken,
   type BufferOAuthConfig,
 } from '../src/buffer/oauth.js';
@@ -66,6 +67,43 @@ describe('authorizationUrl', () => {
   it('never puts the client secret in the redirect the browser follows', () => {
     const url = authorizationUrl(CONFIG, 'state123', 'challenge123');
     expect(url).not.toContain('secret-xyz');
+  });
+
+  // Without this, an already-approved user is sent straight past the approval
+  // screen and Buffer returns no refresh token — so the FIRST sign-in works and
+  // every one after it fails. Signing in on a second device is the usual way to
+  // discover that.
+  it('forces the approval screen, so a repeat sign-in still yields a refresh token', () => {
+    const url = new URL(authorizationUrl(CONFIG, 's', 'c', { forceConsent: true }));
+    expect(url.searchParams.get('prompt')).toBe('consent');
+  });
+
+  it('omits prompt when consent is not forced, leaving the retry path clean', () => {
+    for (const url of [
+      authorizationUrl(CONFIG, 's', 'c'),
+      authorizationUrl(CONFIG, 's', 'c', { forceConsent: false }),
+    ]) {
+      expect(new URL(url).searchParams.has('prompt')).toBe(false);
+    }
+  });
+});
+
+describe('promptRejected', () => {
+  // `prompt` cannot be exercised outside the deployed origin, so the retry it
+  // guards is the difference between "one wasted redirect" and "nobody can sign
+  // in" if Buffer turns out not to accept it.
+  it('recognises a server objecting to the parameter', () => {
+    expect(promptRejected('invalid_request')).toBe(true);
+    expect(promptRejected('invalid_request', 'Unsupported parameter')).toBe(true);
+    expect(promptRejected('server_error', 'prompt is not supported')).toBe(true);
+  });
+
+  it('does not mistake a real refusal for a bad parameter', () => {
+    expect(promptRejected('access_denied')).toBe(false);
+    expect(promptRejected('server_error')).toBe(false);
+    expect(
+      promptRejected('server_error', 'Please stop impersonation first.'),
+    ).toBe(false);
   });
 });
 

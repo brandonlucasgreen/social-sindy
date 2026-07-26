@@ -106,6 +106,23 @@ export interface UpsertUserInput {
 }
 
 /**
+ * Looks up the user for a Buffer account without creating one.
+ *
+ * Distinct from `upsertUser` because sign-in sometimes has to ask "do we
+ * already know this account?" *before* deciding the sign-in can succeed, and
+ * answering that question must not itself leave a half-made account behind.
+ */
+export function getUserByBufferAccountId(
+  db: D1Database,
+  bufferAccountId: string,
+): Promise<UserRow | null> {
+  return db
+    .prepare('SELECT * FROM users WHERE buffer_account_id = ?')
+    .bind(bufferAccountId)
+    .first<UserRow>();
+}
+
+/**
  * Creates or refreshes the user for a Buffer account.
  *
  * Connecting Buffer is also how a user signs in, so a returning user must map
