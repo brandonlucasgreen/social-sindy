@@ -473,9 +473,13 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
     <body>
       <div class={narrow ? 'wrap narrow' : 'wrap'}>
         <header class="masthead">
+          {/* Display only. The hyphenated `social-cally` remains the project's
+              identity everywhere it is load-bearing — package, Worker, D1
+              database, repo, and the ICS UID domain, which must never change
+              or every subscribed client deletes and recreates every event. */}
           <a class="brand" href="/">
             <Mark />
-            social-cally
+            social cally
           </a>
           {user ? (
             <span class="who">
