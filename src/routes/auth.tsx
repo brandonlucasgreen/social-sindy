@@ -13,6 +13,7 @@ import { Hono } from 'hono';
 import { BufferAuthError, BufferClient, BufferRateLimitError } from '../buffer/client.js';
 import { fingerprintSecret, sealSecret } from '../crypto.js';
 import { deleteSession, deleteUser, saveCredential, upsertUser } from '../db.js';
+import { serviceColor, serviceLabel } from '../present.js';
 import { Layout, Notice } from '../ui/layout.jsx';
 import {
   clearSessionCookie,
@@ -27,48 +28,122 @@ export const authRoutes = new Hono<AppBindings>();
 
 const KEY_SETTINGS_URL = 'https://publish.buffer.com/settings/api';
 
+/**
+ * Illustrative sample content for the hero, not real account data. It exists to
+ * show the actual output — network-coloured post chips laid across a week —
+ * rather than describe it in prose.
+ */
+const SAMPLE_WEEK: { day: string; today?: boolean; posts: { service: string; text: string }[] }[] = [
+  { day: 'Mon', posts: [{ service: 'linkedin', text: 'Closing the laptop' }] },
+  { day: 'Tue', posts: [{ service: 'threads', text: 'Booze cruise idea' }, { service: 'bluesky', text: 'What are you…' }] },
+  { day: 'Wed', today: true, posts: [{ service: 'instagram', text: '$0.003 a stream' }] },
+  { day: 'Thu', posts: [{ service: 'mastodon', text: 'Buy direct' }] },
+  { day: 'Fri', posts: [{ service: 'threads', text: 'Friday links' }, { service: 'youtube', text: 'New demo' }] },
+  { day: 'Sat', posts: [] },
+  { day: 'Sun', posts: [{ service: 'pinterest', text: 'Sleeve art' }] },
+];
+
+const HeroDemo = () => (
+  <figure class="demo">
+    <div class="demo-head">
+      <b>Buffer — Cult of Lightbulbs</b>
+      <span>This week</span>
+    </div>
+    <div class="week">
+      {SAMPLE_WEEK.map((day) => (
+        <div class={day.today ? 'day today' : 'day'}>
+          <b>{day.day}</b>
+          {day.posts.map((post) => (
+            <div class="chip" style={`--net:${serviceColor(post.service)}`}>
+              <span title={`${serviceLabel(post.service)} — ${post.text}`}>{post.text}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+    <figcaption class="small" style="margin-top:0.75rem">
+      Example of the result. Each scheduled post becomes an event, coloured by network.
+    </figcaption>
+  </figure>
+);
+
 function ConnectPage({ error }: { error?: string }) {
   return (
-    <Layout title="Connect Buffer — Buffer → Calendar">
-      <h1>See your Buffer queue in your calendar</h1>
+    <Layout title="buffer-cal — your Buffer queue in your calendar">
+      <h1>Your posting queue, in the calendar you actually check.</h1>
       <p class="lede">
-        Pick the channels you care about and get a calendar feed you can subscribe to in Google
-        Calendar, Apple Calendar, or Outlook. Every scheduled post shows up as an event.
+        Connect Buffer, choose your channels, and get a calendar you can subscribe to in Google
+        Calendar, Apple Calendar, or Outlook.
       </p>
+
+      <HeroDemo />
 
       {error ? <Notice kind="error">{error}</Notice> : null}
 
-      <div class="card">
-        <form method="post" action="/connect">
-          <div class="field">
-            <label for="apiKey">Buffer API key</label>
-            <input
-              type="password"
-              id="apiKey"
-              name="apiKey"
-              required
-              autocomplete="off"
-              spellcheck={false}
-              placeholder="Paste your key"
-            />
-            <small>
-              Create one under{' '}
-              <a href={KEY_SETTINGS_URL} target="_blank" rel="noreferrer noopener">
-                Buffer → Settings → API
-              </a>
-              . Connecting your key also signs you in.
-            </small>
-          </div>
+      <form method="post" action="/connect">
+        <label for="apiKey">Buffer API key</label>
+        <div class="inline-form">
+          <input
+            type="password"
+            id="apiKey"
+            name="apiKey"
+            required
+            autocomplete="off"
+            spellcheck={false}
+            placeholder="Paste your Buffer API key"
+          />
           <button type="submit">Connect Buffer</button>
-        </form>
+        </div>
+        <small style="display:block;margin-top:0.625rem">
+          Create a key under{' '}
+          <a href={KEY_SETTINGS_URL} target="_blank" rel="noreferrer noopener">
+            Buffer → Settings → API
+          </a>
+          . Connecting it also signs you in — there is no separate account.
+        </small>
+      </form>
+
+      <h2>What it can and cannot do</h2>
+      <div class="trust">
+        <div>
+          <h3>
+            <span class="tick" aria-hidden="true">
+              ✓
+            </span>
+            Reads your schedule
+          </h3>
+          <p>Your account, channel list, and scheduled posts. Nothing else.</p>
+        </div>
+        <div>
+          <h3>
+            <span class="tick" aria-hidden="true">
+              ✓
+            </span>
+            Encrypted at rest
+          </h3>
+          <p>Your key is sealed with AES-256-GCM and never written to a log.</p>
+        </div>
+        <div>
+          <h3>
+            <span class="tick" aria-hidden="true">
+              ✓
+            </span>
+            Revocable anytime
+          </h3>
+          <p>Delete the key in Buffer, or delete your account here, and access ends.</p>
+        </div>
+        <div>
+          <h3>Never publishes</h3>
+          <p>No post is created, edited, or deleted in your Buffer account.</p>
+        </div>
       </div>
 
       <Notice>
         <p>
-          <strong>What this key can do.</strong> A Buffer API key grants full access to your Buffer
-          account, including publishing. This app only ever reads your account, channels, and
-          scheduled posts — but you are trusting it with the key, so it is stored encrypted and you
-          can revoke it in Buffer at any time.
+          <strong>Worth knowing before you paste it.</strong> A Buffer API key grants full access to
+          your Buffer account, including publishing — Buffer does not yet offer scoped third-party
+          OAuth, so a key is currently the only way in. This tool only ever reads, but you are
+          trusting it with a broad credential, so treat that as a real decision.
         </p>
       </Notice>
     </Layout>

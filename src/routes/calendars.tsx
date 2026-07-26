@@ -17,8 +17,8 @@ import {
   updateCalendar,
   type CalendarWithChannels,
 } from '../db.js';
-import { serviceLabel } from '../ics/generate.js';
-import { Layout, Notice } from '../ui/layout.jsx';
+import { serviceColor, serviceLabel } from '../present.js';
+import { Layout, Notice, Steps } from '../ui/layout.jsx';
 import {
   accountFor,
   channelsFor,
@@ -153,24 +153,37 @@ const ChannelPicker: FC<{ channels: BufferChannel[]; selected: Set<string> }> = 
   selected,
 }) => (
   <div class="channels">
-    {channels.map((channel) => (
-      <label class={channel.isDisconnected ? 'channel off' : 'channel'}>
+    {channels.map((channel) => {
+      const name = channel.displayName?.trim() || channel.name;
+      const net = serviceColor(channel.service);
+      return (
+      <label class={channel.isDisconnected ? 'channel off' : 'channel'} style={`--net:${net}`}>
         <input
           type="checkbox"
           name="channelIds"
           value={channel.id}
           checked={selected.has(channel.id)}
         />
-        {channel.avatar ? <img src={channel.avatar} alt="" loading="lazy" /> : <span class="avatar" />}
+        {channel.avatar ? (
+          <img class="avatar" src={channel.avatar} alt="" loading="lazy" />
+        ) : (
+          <span class="avatar fallback" aria-hidden="true">
+            {Array.from(name)[0] ?? '?'}
+          </span>
+        )}
         <span class="meta">
-          <strong>{channel.displayName?.trim() || channel.name}</strong>
+          <strong>{name}</strong>
           <small>
+            {/* Colour is identity, but never the only signal — the network name
+                always sits beside it, since several networks are black. */}
+            <span class="dot" aria-hidden="true" />
             {serviceLabel(channel.service)}
             {channel.isDisconnected ? ' · disconnected in Buffer' : ''}
           </small>
         </span>
       </label>
-    ))}
+      );
+    })}
   </div>
 );
 
@@ -277,12 +290,12 @@ calendarRoutes.get('/calendars', async (c) => {
   const calendars = await listCalendars(c.env.DB, user.id);
 
   return c.html(
-    <Layout title="Your calendars — Buffer → Calendar" user={user}>
+    <Layout title="Your calendars — buffer-cal" user={user}>
       <h1>Your calendars</h1>
       <p class="lede">Each calendar is one subscribable feed of your Buffer schedule.</p>
 
       {calendars.length === 0 ? (
-        <div class="card">
+        <div class="panel">
           <div class="empty">
             <p>You have not created a calendar yet.</p>
             <a class="btn" href="/calendars/new">
@@ -295,22 +308,22 @@ calendarRoutes.get('/calendars', async (c) => {
           {calendars.map((calendar) => {
             const state = syncState(calendar);
             return (
-              <div class="card">
-                <div class="cal-item">
+              <div class="panel">
+                <div class="cal">
                   <div>
                     <h3>
                       <a href={`/calendars/${calendar.id}`}>{calendar.name}</a>
                     </h3>
-                    <div class="tags">
+                    <div class="meta-line">
                       {calendar.organization_name} · {calendar.channels.length}{' '}
                       {calendar.channels.length === 1 ? 'channel' : 'channels'}
                     </div>
-                    <div class="tags">
-                      <span class={`status-dot ${state.cls}`} />
+                    <div class="meta-line">
+                      <span class={`state ${state.cls}`} />
                       {state.text}
                     </div>
                   </div>
-                  <a class="btn btn-secondary" href={`/calendars/${calendar.id}`}>
+                  <a class="btn btn-quiet" href={`/calendars/${calendar.id}`}>
                     Subscribe
                   </a>
                 </div>
@@ -326,7 +339,7 @@ calendarRoutes.get('/calendars', async (c) => {
       )}
 
       <h2>Account</h2>
-      <div class="card">
+      <div class="panel">
         <p class="small">
           Signed in as {user.email}. Deleting your account removes your stored Buffer API key and
           every calendar you created here. It does not touch anything in Buffer.
@@ -358,11 +371,11 @@ function bufferErrorPage(c: AppContext, error: unknown) {
         : `Could not reach Buffer: ${(error as Error).message}`;
 
   return c.html(
-    <Layout title="Buffer unavailable — Buffer → Calendar" user={user}>
+    <Layout title="Buffer unavailable — buffer-cal" user={user}>
       <h1>Buffer could not be reached</h1>
       <Notice kind="error">{message}</Notice>
       <div class="btn-row">
-        <a class="btn btn-secondary" href="/calendars">
+        <a class="btn btn-quiet" href="/calendars">
           Back to calendars
         </a>
         {error instanceof BufferAuthError ? (
@@ -389,20 +402,18 @@ calendarRoutes.get('/calendars/new', async (c) => {
         return c.redirect(`/calendars/new?org=${account.organizations[0]!.id}`, 302);
       }
       return c.html(
-        <Layout title="Choose an organization — Buffer → Calendar" user={user}>
-          <div class="steps">
-            <span class="on">1. Organization</span> <span>2. Channels</span> <span>3. Subscribe</span>
-          </div>
+        <Layout title="Choose an organization — buffer-cal" user={user} narrow>
+          <Steps at={1} />
           <h1>Which Buffer organization?</h1>
           <p class="lede">Each calendar covers channels from a single organization.</p>
           {account.organizations.map((org) => (
-            <div class="card">
-              <div class="cal-item">
+            <div class="panel">
+              <div class="cal">
                 <div>
                   <h3>{org.name}</h3>
-                  <div class="tags">{org.ownerEmail}</div>
+                  <div class="meta-line">{org.ownerEmail}</div>
                 </div>
-                <a class="btn btn-secondary" href={`/calendars/new?org=${org.id}`}>
+                <a class="btn btn-quiet" href={`/calendars/new?org=${org.id}`}>
                   Choose
                 </a>
               </div>
@@ -429,16 +440,14 @@ calendarRoutes.get('/calendars/new', async (c) => {
     };
 
     return c.html(
-      <Layout title="Choose channels — Buffer → Calendar" user={user}>
-        <div class="steps">
-          <span>1. Organization</span> <span class="on">2. Channels</span> <span>3. Subscribe</span>
-        </div>
+      <Layout title="Choose channels — buffer-cal" user={user}>
+        <Steps at={2} />
         <h1>{organization.name}</h1>
         <p class="lede">Pick the channels whose posts should appear on the calendar.</p>
 
         <form method="post" action="/calendars">
           <input type="hidden" name="organizationId" value={organization.id} />
-          <div class="card">
+          <div class="panel">
             {channels.length === 0 ? (
               <p class="small">This organization has no channels connected in Buffer.</p>
             ) : (
@@ -446,7 +455,7 @@ calendarRoutes.get('/calendars/new', async (c) => {
             )}
           </div>
 
-          <div class="card">
+          <div class="panel">
             <SettingsFields settings={settings} />
           </div>
 
@@ -454,7 +463,7 @@ calendarRoutes.get('/calendars/new', async (c) => {
             <button type="submit" disabled={channels.length === 0}>
               Create calendar
             </button>
-            <a class="btn btn-secondary" href="/calendars">
+            <a class="btn btn-quiet" href="/calendars">
               Cancel
             </a>
           </div>
@@ -487,7 +496,7 @@ calendarRoutes.post('/calendars', async (c) => {
 
     if (!chosen.length) {
       return c.html(
-        <Layout title="Choose channels — Buffer → Calendar" user={user}>
+        <Layout title="Choose channels — buffer-cal" user={user}>
           <h1>Pick at least one channel</h1>
           <Notice kind="error">A calendar needs at least one channel to show anything.</Notice>
           <a class="btn" href={`/calendars/new?org=${organizationId}`}>
@@ -534,10 +543,8 @@ calendarRoutes.get('/calendars/:id', async (c) => {
   const state = syncState(calendar);
 
   return c.html(
-    <Layout title={`${calendar.name} — Buffer → Calendar`} user={user}>
-      <div class="steps">
-        <span>1. Organization</span> <span>2. Channels</span> <span class="on">3. Subscribe</span>
-      </div>
+    <Layout title={`${calendar.name} — buffer-cal`} user={user}>
+      <Steps at={3} />
       <h1>{calendar.name}</h1>
       <p class="lede">
         {calendar.organization_name} · {calendar.channels.map((ch) => ch.channel_name).join(', ')}
@@ -545,15 +552,15 @@ calendarRoutes.get('/calendars/:id', async (c) => {
 
       {justCreated ? <Notice>Your calendar is ready. Subscribe to it below.</Notice> : null}
 
-      <div class="card">
+      <div class="panel">
         <h3>Subscription URL</h3>
         <p class="small">
           Anyone with this URL can read your post schedule, so treat it like a password. You can
           replace it below if it leaks.
         </p>
-        <div class="url-box">
+        <div class="url">
           <code>{urls.https}</code>
-          <button type="button" class="btn-secondary" data-copy={urls.https}>
+          <button type="button" class="btn-quiet" data-copy={urls.https}>
             Copy
           </button>
         </div>
@@ -561,7 +568,7 @@ calendarRoutes.get('/calendars/:id', async (c) => {
           <a class="btn" href={urls.google} target="_blank" rel="noreferrer noopener">
             Add to Google Calendar
           </a>
-          <a class="btn btn-secondary" href={urls.webcal}>
+          <a class="btn btn-quiet" href={urls.webcal}>
             Add to Apple Calendar
           </a>
         </div>
@@ -580,7 +587,7 @@ calendarRoutes.get('/calendars/:id', async (c) => {
       </Notice>
 
       <h2>Manual setup</h2>
-      <div class="card">
+      <div class="panel">
         <p class="small">
           <strong>Google Calendar:</strong> Other calendars → + → From URL → paste the URL above.
           <br />
@@ -592,9 +599,9 @@ calendarRoutes.get('/calendars/:id', async (c) => {
       </div>
 
       <h2>Status</h2>
-      <div class="card">
+      <div class="panel">
         <p class="small">
-          <span class={`status-dot ${state.cls}`} />
+          <span class={`state ${state.cls}`} />
           {state.text}
           {calendar.last_polled_at ? (
             <>
@@ -611,9 +618,9 @@ calendarRoutes.get('/calendars/:id', async (c) => {
       </div>
 
       <h2>Manage</h2>
-      <div class="card">
+      <div class="panel">
         <div class="btn-row">
-          <a class="btn btn-secondary" href={`/calendars/${calendar.id}/edit`}>
+          <a class="btn btn-quiet" href={`/calendars/${calendar.id}/edit`}>
             Edit settings
           </a>
           <form
@@ -621,7 +628,7 @@ calendarRoutes.get('/calendars/:id', async (c) => {
             action={`/calendars/${calendar.id}/rotate`}
             onsubmit="return confirm('Replace the URL? You will need to re-subscribe in every calendar app.')"
           >
-            <button class="btn btn-secondary" type="submit">
+            <button class="btn btn-quiet" type="submit">
               Replace URL
             </button>
           </form>
@@ -661,20 +668,20 @@ calendarRoutes.get('/calendars/:id/edit', async (c) => {
     };
 
     return c.html(
-      <Layout title={`Edit ${calendar.name} — Buffer → Calendar`} user={user}>
+      <Layout title={`Edit ${calendar.name} — buffer-cal`} user={user}>
         <h1>Edit calendar</h1>
         <p class="lede">{calendar.organization_name}</p>
 
         <form method="post" action={`/calendars/${calendar.id}`}>
-          <div class="card">
+          <div class="panel">
             <ChannelPicker channels={channels} selected={new Set(settings.channelIds)} />
           </div>
-          <div class="card">
+          <div class="panel">
             <SettingsFields settings={settings} />
           </div>
           <div class="btn-row">
             <button type="submit">Save changes</button>
-            <a class="btn btn-secondary" href={`/calendars/${calendar.id}`}>
+            <a class="btn btn-quiet" href={`/calendars/${calendar.id}`}>
               Cancel
             </a>
           </div>
