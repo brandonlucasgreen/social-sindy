@@ -3,22 +3,24 @@
  * check." It refuses the category default — a centered white card holding a
  * lone API-key field on a gray gradient — and leads with the artifact itself.
  *
- * OWN-WORLD: Buffer's real tokens, brand-adjacent, no Buffer mark. Warm cream
- * ground (or dark-teal inverse), dark-teal text never black, mint primary
- * carrying dark text, full-pill controls, 10/20/40px radii, and Buffer's
- * signature card shadow whose third layer is a solid un-blurred 8px teal
- * offset — a sticker edge that presses in when clicked.
+ * OWN-WORLD: Brand-adjacent but not Buffer-liveried, and deliberately drifting
+ * further as the tool establishes itself as third-party. Cool slate ground (or
+ * navy inverse), navy text never black, a steel-blue primary carrying dark
+ * text, full-pill controls, 10/20/40px radii, and a card shadow whose third
+ * layer is a solid un-blurred 8px offset — a sticker edge that presses in when
+ * clicked. Buffer's structural cues (pill geometry, offset depth, the fluid
+ * scales) survive; its cream-and-mint colouring and its typeface do not.
  *
  * STORY: A cold visitor sees their own posting week rendered as calendar
  * events, understands this is read-only, and connects Buffer.
  *
  * FIRST VIEWPORT: Large regular-weight headline at -0.02em; beneath it a live
  * week strip of network-coloured post chips demonstrating the output; then a
- * pill input paired with a mint pill button; then what it can and cannot see.
+ * pill input paired with a steel-blue pill button; then what it can and cannot see.
  *
  * FORM: Brief-pinned world (Buffer marketing language), so no concept roll.
- * Rendered from the palette's full range — pastels, pill geometry, offset
- * depth — not its softest reading.
+ * Rendered from the palette's full range — pill geometry, offset depth, real
+ * network colour on the sample chips — not its softest reading.
  */
 
 import type { FC, PropsWithChildren } from 'hono/jsx';
@@ -27,22 +29,17 @@ const STYLES = `
 :root {
   color-scheme: light dark;
 
-  --ground: hsl(40 43% 99%);
+  --ground: hsl(215 32% 98%);
   --raised: hsl(0 0% 100%);
-  --sunken: hsl(60 20% 96%);
-  --text: hsl(176 20% 16%);
-  --text-dim: hsl(60 3% 42%);
-  --border: hsl(53 8% 78%);
-  --border-soft: hsl(53 10% 87%);
-  --mint: hsl(105 68% 77%);
-  --mint-deep: hsl(105 55% 68%);
-  --link: hsl(139 37% 32%);
-  --edge: hsl(180 13% 22%);
-
-  --pastel-purple: hsl(258 100% 88%);
-  --pastel-yellow: hsl(40 100% 77%);
-  --pastel-aqua: hsl(174 64% 77%);
-  --pastel-coral: hsl(7 100% 83%);
+  --sunken: hsl(215 26% 95%);
+  --text: hsl(217 33% 17%);
+  --text-dim: hsl(215 14% 45%);
+  --border: hsl(215 16% 79%);
+  --border-soft: hsl(215 20% 89%);
+  --accent: hsl(214 70% 80%);
+  --accent-deep: hsl(214 58% 71%);
+  --link: hsl(217 61% 38%);
+  --edge: hsl(217 30% 22%);
 
   --warn-bg: hsl(40 100% 88%);
   --warn-edge: hsl(40 70% 41%);
@@ -60,25 +57,25 @@ const STYLES = `
   /* Buffer's own card shadow: two soft ambient layers over a solid offset that
      reads as a physical edge. The third layer is the signature. */
   --shadow-card:
-    0 -0.25rem 1.5rem -0.5rem hsl(176 20% 9% / 0.10),
-    0 0.25rem 0.5rem -0.25rem hsl(176 20% 9% / 0.10),
+    0 -0.25rem 1.5rem -0.5rem hsl(217 33% 9% / 0.10),
+    0 0.25rem 0.5rem -0.25rem hsl(217 33% 9% / 0.10),
     0 0.5rem 0 0 var(--edge);
   --shadow-raised:
-    0 0.25rem 0.75rem -0.125rem hsl(176 20% 9% / 0.10),
-    0 0 0.0625rem 0.0625rem hsl(176 20% 9% / 0.05);
+    0 0.25rem 0.75rem -0.125rem hsl(217 33% 9% / 0.10),
+    0 0 0.0625rem 0.0625rem hsl(217 33% 9% / 0.05);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ground: hsl(176 20% 16%);
-    --raised: hsl(177 22% 20%);
-    --sunken: hsl(176 22% 13%);
-    --text: hsl(40 43% 99%);
-    --text-dim: hsl(60 8% 72%);
-    --border: hsl(176 14% 30%);
-    --border-soft: hsl(176 15% 26%);
-    --link: hsl(105 68% 77%);
-    --edge: hsl(176 28% 9%);
+    --ground: hsl(217 33% 14%);
+    --raised: hsl(217 27% 18%);
+    --sunken: hsl(217 33% 11%);
+    --text: hsl(215 32% 97%);
+    --text-dim: hsl(215 16% 72%);
+    --border: hsl(215 14% 31%);
+    --border-soft: hsl(215 16% 25%);
+    --link: hsl(214 70% 80%);
+    --edge: hsl(217 40% 8%);
 
     --warn-bg: hsl(40 25% 18%);
     --warn-edge: hsl(40 45% 40%);
@@ -117,12 +114,12 @@ body {
 /* Our own mark, deliberately not Buffer's: three stacked bars becoming a date. */
 .brand-mark {
   width: 1.5rem; height: 1.5rem; border-radius: 0.4375rem; flex: none;
-  background: var(--mint); position: relative; overflow: hidden;
+  background: var(--accent); position: relative; overflow: hidden;
 }
 .brand-mark::before,
 .brand-mark::after {
   content: ''; position: absolute; left: 0.3125rem; right: 0.3125rem; height: 0.1875rem;
-  border-radius: 1px; background: hsl(176 20% 16%);
+  border-radius: 1px; background: hsl(217 33% 17%);
 }
 .brand-mark::before { top: 0.4375rem; }
 .brand-mark::after { top: 0.8125rem; opacity: 0.45; }
@@ -209,11 +206,11 @@ button, .btn {
   border: 1px solid transparent; border-radius: var(--pill);
   /* Mint with DARK text — the palette's most recognizable and most easily lost
      detail. White on saturated colour would read as generic SaaS. */
-  background: var(--mint); color: hsl(176 20% 16%);
+  background: var(--accent); color: hsl(217 33% 17%);
   cursor: pointer; text-decoration: none; white-space: nowrap;
   transition: transform var(--dur) var(--ease), background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
-button:hover, .btn:hover { background: var(--mint-deep); }
+button:hover, .btn:hover { background: var(--accent-deep); }
 button:active, .btn:active { transform: translateY(1px); }
 button[disabled], .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; }
 
@@ -265,8 +262,8 @@ button[disabled], .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform
   width: 1.125rem; height: 1.125rem; border-radius: 50%;
   background: var(--border-soft); color: var(--text); font-size: 0.6875rem; font-weight: 600;
 }
-.step.on { color: var(--text); background: var(--mint); }
-.step.on i { background: hsl(176 20% 16%); color: var(--mint); }
+.step.on { color: var(--text); background: var(--accent); }
+.step.on i { background: hsl(217 33% 17%); color: var(--accent); }
 .step.done i { background: var(--link); color: var(--ground); }
 
 /* --- channels ----------------------------------------------------------- */
