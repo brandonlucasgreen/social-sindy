@@ -1,22 +1,30 @@
 /**
- * buffer-cal — turns a Buffer publishing schedule into a subscribable
- * iCalendar feed.
+ * buffer-cally — turns a Buffer publishing schedule into a calendar.
  *
  * Route groups:
- *   /                  connect a Buffer API key (also signs in)
- *   /calendars/*        create and manage feeds
+ *   /                   connect Buffer (also signs in)
+ *   /calendars/*        create and manage calendars
+ *   /google/*           connect Google and drive the optional push
+ *   /privacy            privacy policy
  *   /feed/:token.ics    the public feed calendar clients poll
+ *
+ * Also exports a `scheduled` handler, which is what makes the Google push
+ * timely — the one thing a subscribed ICS feed cannot be.
  */
 
 import { Hono } from 'hono';
 import { csrf } from 'hono/csrf';
 import { HTTPException } from 'hono/http-exception';
 
-import { getCalendarByToken } from './db.js';
+import { calendarsDueForPush, getCalendarByToken } from './db.js';
+import type { Env } from './env.js';
 import { respondWithFeed } from './feed.js';
 import { authRoutes } from './routes/auth.jsx';
 import { calendarRoutes } from './routes/calendars.jsx';
+import { googleRoutes } from './routes/google.jsx';
+import { privacyRoutes } from './routes/privacy.jsx';
 import { withUser, type AppBindings } from './session.js';
+import { pushCalendar } from './sync/push.js';
 import { Layout, Notice } from './ui/layout.jsx';
 
 const app = new Hono<AppBindings>();
@@ -55,12 +63,14 @@ app.get('/healthz', (c) => c.text('ok'));
 app.use('*', csrf());
 app.use('*', withUser);
 
+app.route('/', privacyRoutes);
 app.route('/', authRoutes);
 app.route('/', calendarRoutes);
+app.route('/', googleRoutes);
 
 app.notFound((c) =>
   c.html(
-    <Layout title="Not found — buffer-cal" user={c.get('user')}>
+    <Layout title="Not found — buffer-cally" user={c.get('user')}>
       <h1>Not found</h1>
       <p>
         <a href="/">Back to the start</a>
@@ -75,7 +85,7 @@ app.onError((error, c) => {
   // already carry the right status, and must not be flattened into a 500.
   if (error instanceof HTTPException) {
     return c.html(
-      <Layout title="Request blocked — buffer-cal" user={c.get('user')}>
+      <Layout title="Request blocked — buffer-cally" user={c.get('user')}>
         <h1>Request blocked</h1>
         <Notice kind="error">
           {error.status === 403
@@ -95,7 +105,7 @@ app.onError((error, c) => {
   console.error('unhandled error', error);
 
   return c.html(
-    <Layout title="Something went wrong — buffer-cal" user={c.get('user')}>
+    <Layout title="Something went wrong — buffer-cally" user={c.get('user')}>
       <h1>Something went wrong</h1>
       <Notice kind="error">
         That request could not be completed. If it keeps happening, disconnect and reconnect your
@@ -109,4 +119,41 @@ app.onError((error, c) => {
   );
 });
 
-export default app;
+/**
+ * Most calendars a single tick can sync.
+ *
+ * A cron invocation has a bounded CPU budget, and each calendar costs several
+ * Google calls. Anything not reached is picked up on the next tick, since the
+ * query orders by least-recently-pushed.
+ */
+const MAX_CALENDARS_PER_TICK = 20;
+
+/**
+ * Scheduled push.
+ *
+ * The cron fires on a fixed short interval; each calendar's own refresh setting
+ * decides whether it is actually due, so a once-a-day calendar is not synced
+ * every tick. One calendar failing must not stop the others, so failures are
+ * logged and recorded against that calendar rather than thrown.
+ */
+async function scheduled(_event: ScheduledController, env: Env): Promise<void> {
+  const due = await calendarsDueForPush(env.DB, new Date(), MAX_CALENDARS_PER_TICK);
+  if (!due.length) return;
+
+  console.log(`push tick: ${due.length} calendar(s) due`);
+
+  for (const calendar of due) {
+    try {
+      const outcome = await pushCalendar(env, calendar);
+      if (!outcome.noop) {
+        console.log(
+          `pushed calendar=${calendar.id} +${outcome.stats.created} ~${outcome.stats.updated} -${outcome.stats.deleted}`,
+        );
+      }
+    } catch (error) {
+      console.error(`push failed calendar=${calendar.id}`, error);
+    }
+  }
+}
+
+export default { fetch: app.fetch, scheduled };

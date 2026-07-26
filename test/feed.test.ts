@@ -55,6 +55,11 @@ function calendar(overrides: Partial<CalendarWithChannels> = {}): CalendarWithCh
     last_fetched_at: null,
     last_event_count: null,
     last_error: null,
+    google_calendar_id: null,
+    push_enabled: 0,
+    last_push_at: null,
+    last_push_error: null,
+    last_push_stats: null,
     channels: [
       { calendar_id: 'cal_1', channel_id: 'ch_a', channel_name: 'kidlightbulbs', service: 'threads' },
     ],

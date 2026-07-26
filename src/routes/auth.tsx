@@ -1,11 +1,14 @@
 /**
  * Connecting a Buffer account, which is also how a user signs in.
  *
- * Buffer has not enabled third-party OAuth on its GraphQL API, so users paste a
- * personal API key from publish.buffer.com/settings/api. The key is validated
- * against the API, then sealed with AES-256-GCM before it touches the database.
- * When OAuth does become available, it replaces this handler without changing
- * the rest of the app: everything downstream only needs a user and a credential.
+ * Buffer does support OAuth (authorization code + PKCE against auth.buffer.com),
+ * but it requires a public HTTPS redirect URI, so it only works once deployed.
+ * Until this deployment registers a client, users paste a personal API key from
+ * publish.buffer.com/settings/api. The key is validated against the API, then
+ * sealed with AES-256-GCM before it touches the database.
+ *
+ * Swapping in OAuth replaces this handler and nothing else: everything
+ * downstream needs only a user and a credential.
  */
 
 import { Hono } from 'hono';
@@ -69,7 +72,7 @@ const HeroDemo = () => (
 
 function ConnectPage({ error }: { error?: string }) {
   return (
-    <Layout title="buffer-cal — your Buffer queue in your calendar">
+    <Layout title="buffer-cally — your Buffer queue in your calendar">
       <h1>Your posting queue, in the calendar you actually check.</h1>
       <p class="lede">
         Connect Buffer, choose your channels, and get a calendar you can subscribe to in Google
@@ -141,9 +144,9 @@ function ConnectPage({ error }: { error?: string }) {
       <Notice>
         <p>
           <strong>Worth knowing before you paste it.</strong> A Buffer API key grants full access to
-          your Buffer account, including publishing — Buffer does not yet offer scoped third-party
-          OAuth, so a key is currently the only way in. This tool only ever reads, but you are
-          trusting it with a broad credential, so treat that as a real decision.
+          your Buffer account, including publishing. This tool only ever reads — but a key is a
+          broad credential, so handing one over is a real decision. Sign in with Buffer is coming,
+          which will let this ask for read-only access instead; until then a key is the way in.
         </p>
       </Notice>
     </Layout>

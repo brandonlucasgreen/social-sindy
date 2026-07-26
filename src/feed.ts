@@ -13,16 +13,11 @@
  *     most one Buffer fetch per interval, however often the URL is hit.
  */
 
-import {
-  BufferAuthError,
-  BufferClient,
-  BufferRateLimitError,
-  lowestRemaining,
-} from './buffer/client.js';
-import { openSecret } from './crypto.js';
-import { getCredential, parseStatuses, recordPoll, type CalendarWithChannels } from './db.js';
+import { BufferRateLimitError } from './buffer/client.js';
+import { recordPoll, type CalendarWithChannels } from './db.js';
 import type { Env } from './env.js';
 import { generateIcs, type ChannelRef } from './ics/generate.js';
+import { postsForCalendar } from './sync/posts.js';
 
 /** How long a successful render is kept as the fallback for a failed refresh. */
 const LAST_GOOD_TTL_SECONDS = 7 * 86_400;
@@ -118,35 +113,10 @@ async function renderFromBuffer(
   calendar: CalendarWithChannels,
   now: Date,
 ): Promise<string> {
-  const credential = await getCredential(env.DB, calendar.user_id);
-  if (!credential) throw new BufferAuthError('No Buffer API key is stored for this calendar');
-
-  const apiKey = await openSecret(
-    { ciphertext: credential.ciphertext, iv: credential.iv },
-    env.ENCRYPTION_KEY,
-  );
-
-  const client = new BufferClient(apiKey);
-  const start = new Date(now.getTime() - calendar.window_past_days * 86_400_000);
-  const end = new Date(now.getTime() + calendar.window_future_days * 86_400_000);
-
-  const { posts, rateLimit, truncated } = await client.fetchPosts({
-    organizationId: calendar.organization_id,
-    channelIds: calendar.channels.map((c) => c.channel_id),
-    statuses: parseStatuses(calendar.statuses),
-    start,
-    end,
-  });
-
-  const remaining = lowestRemaining(rateLimit);
-  if (remaining !== null && remaining < 10) {
-    console.warn(
-      `calendar=${calendar.id} buffer quota nearly exhausted, remaining=${remaining}`,
-    );
-  }
-  if (truncated) {
-    console.warn(`calendar=${calendar.id} hit the page cap; feed may omit the tail of the queue`);
-  }
+  // Read through the shared post cache, so a Google push in the same interval
+  // reuses this fetch rather than spending another Buffer request.
+  const { bundle } = await postsForCalendar(env, calendar, now);
+  const { posts, truncated } = bundle;
 
   const description = truncated
     ? `${calendar.organization_name} — showing the first pages of a large queue`

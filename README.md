@@ -1,4 +1,4 @@
-# buffer-cal
+# buffer-cally
 
 Turns a Buffer publishing schedule into a calendar feed you can subscribe to in
 Google Calendar, Apple Calendar, or Outlook. Connect Buffer, pick an
@@ -50,15 +50,25 @@ each user spends their own.
 
 ## Authentication
 
-Buffer has **not** enabled third-party OAuth on its GraphQL API — the documented
-OAuth guide 404s, and app registration is closed. So users paste a personal API
-key from [Buffer → Settings → API](https://publish.buffer.com/settings/api).
-Connecting the key is also how a user signs in.
+Buffer **does** support OAuth — authorization code + PKCE against
+`auth.buffer.com/auth` and `/token`. Its published docs are thin (the OAuth guide
+404s), which is easy to mistake for the feature not existing; it exists.
 
-That key grants full access to its owner's Buffer account, including publishing.
-It is validated against the API, sealed with AES-256-GCM under `ENCRYPTION_KEY`
+Two things to know. OAuth requires a **public HTTPS redirect URI**, so it cannot
+be exercised from plain localhost — a Cloudflare `*.workers.dev` origin satisfies
+it for free. And Buffer **rotates the refresh token on every use**, so the newly
+returned one must always be persisted; in a server app hit concurrently, refreshes
+must be single-flighted or two of them will invalidate each other.
+
+Until this deployment registers a client, users paste a personal API key from
+[Buffer → Settings → API](https://publish.buffer.com/settings/api). Connecting the
+key is also how a user signs in.
+
+That key grants full access to its owner's Buffer account, including publishing —
+which is why OAuth is worth moving to, since it can request read-only scopes. The
+key is validated against the API, sealed with AES-256-GCM under `ENCRYPTION_KEY`
 before it reaches the database, and never logged or returned in a response body.
-When Buffer does enable OAuth, it replaces `src/routes/auth.tsx` without touching
+Swapping in OAuth replaces `src/routes/auth.tsx` without touching
 the rest of the app: everything downstream needs only a user and a credential.
 
 ## Setup
@@ -71,7 +81,7 @@ Create the D1 database and KV namespace, then put the returned IDs into
 `wrangler.toml` (it ships with `PLACEHOLDER_REPLACE_AFTER_CREATE`):
 
 ```bash
-npx wrangler d1 create buffer-cal
+npx wrangler d1 create buffer-cally
 ```
 
 ```bash

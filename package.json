@@ -1,5 +1,5 @@
 {
-  "name": "buffer-cal",
+  "name": "buffer-cally",
   "version": "0.1.0",
   "private": true,
   "description": "Sync your Buffer publishing schedule to Google Calendar, Apple Calendar, and Outlook via a subscribable iCalendar feed.",
@@ -10,8 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:migrate:local": "wrangler d1 migrations apply buffer-cal --local",
-    "db:migrate:remote": "wrangler d1 migrations apply buffer-cal --remote",
+    "db:migrate:local": "wrangler d1 migrations apply buffer-cally --local",
+    "db:migrate:remote": "wrangler d1 migrations apply buffer-cally --remote",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {

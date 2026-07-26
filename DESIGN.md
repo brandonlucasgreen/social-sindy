@@ -1,6 +1,6 @@
 # Design
 
-Durable visual rules for buffer-cal. Product truth lives in [PRODUCT.md](PRODUCT.md).
+Durable visual rules for buffer-cally. Product truth lives in [PRODUCT.md](PRODUCT.md).
 
 The world is **brand-adjacent to Buffer**: close enough that a Buffer user feels
 at home immediately, never close enough to pass as first-party. No Buffer logo or

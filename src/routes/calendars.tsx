@@ -17,7 +17,9 @@ import {
   updateCalendar,
   type CalendarWithChannels,
 } from '../db.js';
+import { getGoogleCredential } from '../db.js';
 import { serviceColor, serviceLabel } from '../present.js';
+import { googleConfig } from '../sync/google-config.js';
 import { Layout, Notice, Steps } from '../ui/layout.jsx';
 import {
   accountFor,
@@ -285,12 +287,45 @@ function syncState(calendar: CalendarWithChannels): { cls: string; text: string 
   };
 }
 
+/** Human-readable state of the most recent Google push, if there was one. */
+function pushStatus(calendar: CalendarWithChannels): { cls: string; text: string } | null {
+  if (calendar.last_push_error) {
+    return { cls: 'bad', text: `Last sync failed: ${calendar.last_push_error}` };
+  }
+  if (!calendar.last_push_at) return { cls: 'stale', text: 'Not synced yet' };
+
+  const ageMinutes = Math.round((Date.now() - Date.parse(calendar.last_push_at)) / 60_000);
+  const when =
+    ageMinutes < 1 ? 'just now' : ageMinutes < 60 ? `${ageMinutes}m ago` : `${Math.round(ageMinutes / 60)}h ago`;
+
+  let detail = '';
+  if (calendar.last_push_stats) {
+    try {
+      const stats = JSON.parse(calendar.last_push_stats) as {
+        created: number;
+        updated: number;
+        deleted: number;
+      };
+      const parts = [
+        stats.created ? `${stats.created} added` : '',
+        stats.updated ? `${stats.updated} updated` : '',
+        stats.deleted ? `${stats.deleted} removed` : '',
+      ].filter(Boolean);
+      detail = parts.length ? ` · ${parts.join(', ')}` : ' · no changes';
+    } catch {
+      // Malformed stats are cosmetic; the timestamp is the useful part.
+    }
+  }
+
+  return { cls: '', text: `Synced ${when}${detail}` };
+}
+
 calendarRoutes.get('/calendars', async (c) => {
   const user = c.get('user')!;
   const calendars = await listCalendars(c.env.DB, user.id);
 
   return c.html(
-    <Layout title="Your calendars — buffer-cal" user={user}>
+    <Layout title="Your calendars — buffer-cally" user={user}>
       <h1>Your calendars</h1>
       <p class="lede">Each calendar is one subscribable feed of your Buffer schedule.</p>
 
@@ -371,7 +406,7 @@ function bufferErrorPage(c: AppContext, error: unknown) {
         : `Could not reach Buffer: ${(error as Error).message}`;
 
   return c.html(
-    <Layout title="Buffer unavailable — buffer-cal" user={user}>
+    <Layout title="Buffer unavailable — buffer-cally" user={user}>
       <h1>Buffer could not be reached</h1>
       <Notice kind="error">{message}</Notice>
       <div class="btn-row">
@@ -402,7 +437,7 @@ calendarRoutes.get('/calendars/new', async (c) => {
         return c.redirect(`/calendars/new?org=${account.organizations[0]!.id}`, 302);
       }
       return c.html(
-        <Layout title="Choose an organization — buffer-cal" user={user} narrow>
+        <Layout title="Choose an organization — buffer-cally" user={user} narrow>
           <Steps at={1} />
           <h1>Which Buffer organization?</h1>
           <p class="lede">Each calendar covers channels from a single organization.</p>
@@ -440,7 +475,7 @@ calendarRoutes.get('/calendars/new', async (c) => {
     };
 
     return c.html(
-      <Layout title="Choose channels — buffer-cal" user={user}>
+      <Layout title="Choose channels — buffer-cally" user={user}>
         <Steps at={2} />
         <h1>{organization.name}</h1>
         <p class="lede">Pick the channels whose posts should appear on the calendar.</p>
@@ -496,7 +531,7 @@ calendarRoutes.post('/calendars', async (c) => {
 
     if (!chosen.length) {
       return c.html(
-        <Layout title="Choose channels — buffer-cal" user={user}>
+        <Layout title="Choose channels — buffer-cally" user={user}>
           <h1>Pick at least one channel</h1>
           <Notice kind="error">A calendar needs at least one channel to show anything.</Notice>
           <a class="btn" href={`/calendars/new?org=${organizationId}`}>
@@ -542,8 +577,12 @@ calendarRoutes.get('/calendars/:id', async (c) => {
   const justCreated = c.req.query('created') === '1';
   const state = syncState(calendar);
 
+  const pushAvailable = googleConfig(c.env) !== null;
+  const googleConnected = pushAvailable && (await getGoogleCredential(c.env.DB, user.id)) !== null;
+  const pushState = pushStatus(calendar);
+
   return c.html(
-    <Layout title={`${calendar.name} — buffer-cal`} user={user}>
+    <Layout title={`${calendar.name} — buffer-cally`} user={user}>
       <Steps at={3} />
       <h1>{calendar.name}</h1>
       <p class="lede">
@@ -617,6 +656,68 @@ calendarRoutes.get('/calendars/:id', async (c) => {
         </p>
       </div>
 
+      <h2>Google Calendar sync</h2>
+      {!pushAvailable ? (
+        <div class="panel">
+          <p class="small">
+            Direct Google sync is not configured on this deployment, so the subscription URL above is
+            the way to get this into Google — refreshed on Google's own schedule.
+          </p>
+        </div>
+      ) : calendar.push_enabled === 1 ? (
+        <div class="panel">
+          <h3>On</h3>
+          <p class="small">
+            Events are written straight into a Google calendar named “{calendar.name}”, so changes
+            appear within your refresh interval instead of waiting on Google's 8–24 hour polling.
+            Only events created by this tool are ever touched.
+          </p>
+          {pushState ? (
+            <p class="meta-line">
+              <span class={`state ${pushState.cls}`} />
+              {pushState.text}
+            </p>
+          ) : null}
+          <div class="btn-row">
+            <form method="post" action={`/calendars/${calendar.id}/push/now`}>
+              <button class="btn btn-quiet" type="submit">
+                Sync now
+              </button>
+            </form>
+            <form method="post" action={`/calendars/${calendar.id}/push/disable`}>
+              <button class="btn btn-quiet" type="submit">
+                Turn off
+              </button>
+            </form>
+            <form
+              method="post"
+              action={`/calendars/${calendar.id}/push/remove`}
+              onsubmit="return confirm('Delete the Google calendar this tool created, and all events in it?')"
+            >
+              <button class="btn-danger" type="submit">
+                Delete the Google calendar
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : (
+        <div class="panel">
+          <p class="small">
+            Google ignores the refresh interval on subscribed URLs. Turning this on writes events
+            directly into a dedicated Google calendar instead, so changes land within minutes.
+          </p>
+          <p class="small">
+            It asks for one permission — create a calendar and manage events on calendars it created.
+            It cannot see your existing calendars.
+          </p>
+          <div class="btn-row">
+            <form method="post" action={`/calendars/${calendar.id}/push/enable`}>
+              <button type="submit">{googleConnected ? 'Turn on Google sync' : 'Connect Google'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
       <h2>Manage</h2>
       <div class="panel">
         <div class="btn-row">
@@ -668,7 +769,7 @@ calendarRoutes.get('/calendars/:id/edit', async (c) => {
     };
 
     return c.html(
-      <Layout title={`Edit ${calendar.name} — buffer-cal`} user={user}>
+      <Layout title={`Edit ${calendar.name} — buffer-cally`} user={user}>
         <h1>Edit calendar</h1>
         <p class="lede">{calendar.organization_name}</p>
 

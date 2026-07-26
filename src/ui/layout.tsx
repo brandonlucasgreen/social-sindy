@@ -151,6 +151,17 @@ p { margin: 0 0 0.875rem; max-width: 68ch; }
 small, .small { font-size: 0.875rem; color: var(--text-dim); line-height: 1.45; }
 a { color: var(--link); text-underline-offset: 0.15em; }
 
+ul { max-width: 68ch; margin: 0 0 1rem; padding-left: 1.25rem; }
+li { margin-bottom: 0.5rem; }
+li::marker { color: var(--text-dim); }
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875em;
+  background: var(--sunken);
+  border-radius: 0.25rem;
+  padding: 0.0625rem 0.3125rem;
+}
+
 /* --- surfaces ----------------------------------------------------------- */
 
 .panel {
@@ -473,7 +484,7 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
         <header class="masthead">
           <a class="brand" href="/">
             <span class="brand-mark" aria-hidden="true" />
-            buffer-cal
+            buffer-cally
           </a>
           {user ? (
             <span class="who">
@@ -491,6 +502,9 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
           <p>
             An independent tool, not made by or affiliated with Buffer. It reads your posting
             schedule and never publishes anything.
+          </p>
+          <p>
+            <a href="/privacy">Privacy policy</a>
           </p>
         </footer>
       </div>

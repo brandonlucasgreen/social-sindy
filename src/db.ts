@@ -42,6 +42,13 @@ export interface CalendarRow {
   last_fetched_at: string | null;
   last_event_count: number | null;
   last_error: string | null;
+  /** Set once the dedicated Google calendar has been created. */
+  google_calendar_id: string | null;
+  push_enabled: number;
+  last_push_at: string | null;
+  last_push_error: string | null;
+  /** JSON {created,updated,deleted,unchanged} from the most recent run. */
+  last_push_stats: string | null;
 }
 
 export interface CalendarChannelRow {
@@ -53,6 +60,16 @@ export interface CalendarChannelRow {
 
 export interface CalendarWithChannels extends CalendarRow {
   channels: CalendarChannelRow[];
+  /** Joined from the owning user, for stamping Google events with a zone. */
+  user_timezone?: string;
+}
+
+export interface GoogleCredentialRow {
+  user_id: string;
+  ciphertext: string;
+  iv: string;
+  google_email: string | null;
+  scope: string;
 }
 
 const now = () => new Date().toISOString();
@@ -158,9 +175,147 @@ export async function deleteUser(db: D1Database, userId: string): Promise<void> 
       .bind(userId),
     db.prepare('DELETE FROM calendars WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM credentials WHERE user_id = ?').bind(userId),
+    db.prepare('DELETE FROM google_credentials WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM users WHERE id = ?').bind(userId),
   ]);
+}
+
+// -- google credentials -----------------------------------------------------
+
+export async function saveGoogleCredential(
+  db: D1Database,
+  userId: string,
+  sealed: { ciphertext: string; iv: string },
+  details: { email: string | null; scope: string },
+): Promise<void> {
+  const timestamp = now();
+  await db
+    .prepare(
+      `INSERT INTO google_credentials (user_id, ciphertext, iv, google_email, scope, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         ciphertext = excluded.ciphertext,
+         iv = excluded.iv,
+         google_email = excluded.google_email,
+         scope = excluded.scope,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(userId, sealed.ciphertext, sealed.iv, details.email, details.scope, timestamp, timestamp)
+    .run();
+}
+
+export function getGoogleCredential(
+  db: D1Database,
+  userId: string,
+): Promise<GoogleCredentialRow | null> {
+  return db
+    .prepare(
+      'SELECT user_id, ciphertext, iv, google_email, scope FROM google_credentials WHERE user_id = ?',
+    )
+    .bind(userId)
+    .first<GoogleCredentialRow>();
+}
+
+/**
+ * Disconnects Google and stops every push for this user.
+ *
+ * Push is disabled rather than left enabled-but-broken, so the scheduler does
+ * not keep retrying a credential that is gone.
+ */
+export async function deleteGoogleCredential(db: D1Database, userId: string): Promise<void> {
+  await db.batch([
+    db.prepare('DELETE FROM google_credentials WHERE user_id = ?').bind(userId),
+    db
+      .prepare(
+        `UPDATE calendars SET push_enabled = 0, google_calendar_id = NULL, last_push_error = NULL
+         WHERE user_id = ?`,
+      )
+      .bind(userId),
+  ]);
+}
+
+// -- push state -------------------------------------------------------------
+
+export async function setPushEnabled(
+  db: D1Database,
+  calendarId: string,
+  enabled: boolean,
+): Promise<void> {
+  await db
+    .prepare('UPDATE calendars SET push_enabled = ?, last_push_error = NULL, updated_at = ? WHERE id = ?')
+    .bind(enabled ? 1 : 0, now(), calendarId)
+    .run();
+}
+
+export async function setGoogleCalendarId(
+  db: D1Database,
+  calendarId: string,
+  googleCalendarId: string,
+): Promise<void> {
+  await db
+    .prepare('UPDATE calendars SET google_calendar_id = ? WHERE id = ?')
+    .bind(googleCalendarId, calendarId)
+    .run();
+}
+
+export async function clearGoogleCalendar(db: D1Database, calendarId: string): Promise<void> {
+  await db
+    .prepare('UPDATE calendars SET google_calendar_id = NULL WHERE id = ?')
+    .bind(calendarId)
+    .run();
+}
+
+export async function recordPush(
+  db: D1Database,
+  calendarId: string,
+  outcome: {
+    stats: { created: number; updated: number; deleted: number; unchanged: number } | null;
+    error: string | null;
+  },
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE calendars SET last_push_at = ?, last_push_stats = ?, last_push_error = ? WHERE id = ?`,
+    )
+    .bind(
+      now(),
+      outcome.stats ? JSON.stringify(outcome.stats) : null,
+      outcome.error,
+      calendarId,
+    )
+    .run();
+}
+
+/**
+ * Calendars whose push is due, oldest first.
+ *
+ * The cron fires on a fixed interval; each calendar's own refresh setting
+ * decides whether it is actually due, so a once-a-day calendar is not synced
+ * every five minutes.
+ */
+export async function calendarsDueForPush(
+  db: D1Database,
+  now: Date,
+  limit: number,
+): Promise<CalendarWithChannels[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT calendars.*, users.timezone AS user_timezone FROM calendars
+       JOIN users ON users.id = calendars.user_id
+       WHERE calendars.push_enabled = 1
+         AND calendars.google_calendar_id IS NOT NULL
+         AND (
+           calendars.last_push_at IS NULL
+           OR julianday(?) - julianday(calendars.last_push_at) >= calendars.refresh_minutes / 1440.0
+         )
+       ORDER BY calendars.last_push_at IS NOT NULL, calendars.last_push_at ASC
+       LIMIT ?`,
+    )
+    .bind(now.toISOString(), limit)
+    .all<CalendarRow & { user_timezone: string }>();
+
+  return attachChannels(db, results ?? []);
 }
 
 // -- sessions ---------------------------------------------------------------
@@ -292,7 +447,11 @@ export async function listCalendars(
   userId: string,
 ): Promise<CalendarWithChannels[]> {
   const { results } = await db
-    .prepare('SELECT * FROM calendars WHERE user_id = ? ORDER BY created_at DESC')
+    .prepare(
+      `SELECT calendars.*, users.timezone AS user_timezone FROM calendars
+       JOIN users ON users.id = calendars.user_id
+       WHERE calendars.user_id = ? ORDER BY calendars.created_at DESC`,
+    )
     .bind(userId)
     .all<CalendarRow>();
 
@@ -305,7 +464,11 @@ export async function getCalendar(
   userId: string,
 ): Promise<CalendarWithChannels | null> {
   const calendar = await db
-    .prepare('SELECT * FROM calendars WHERE id = ? AND user_id = ?')
+    .prepare(
+      `SELECT calendars.*, users.timezone AS user_timezone FROM calendars
+       JOIN users ON users.id = calendars.user_id
+       WHERE calendars.id = ? AND calendars.user_id = ?`,
+    )
     .bind(calendarId, userId)
     .first<CalendarRow>();
 
@@ -319,7 +482,11 @@ export async function getCalendarByToken(
   token: string,
 ): Promise<CalendarWithChannels | null> {
   const calendar = await db
-    .prepare('SELECT * FROM calendars WHERE feed_token = ?')
+    .prepare(
+      `SELECT calendars.*, users.timezone AS user_timezone FROM calendars
+       JOIN users ON users.id = calendars.user_id
+       WHERE calendars.feed_token = ?`,
+    )
     .bind(token)
     .first<CalendarRow>();
 
