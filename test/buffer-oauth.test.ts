@@ -88,9 +88,38 @@ describe('hasRequiredScopes', () => {
     expect(hasRequiredScopes('account:read posts:read offline_access')).toBe(true);
   });
 
-  it('rejects a downgraded grant', () => {
+  it('rejects an explicitly downgraded grant', () => {
     expect(hasRequiredScopes('account:read')).toBe(false);
-    expect(hasRequiredScopes('')).toBe(false);
+    expect(hasRequiredScopes('posts:read')).toBe(false);
+  });
+
+  // RFC 6749 §5.1: scope is OPTIONAL in the response when identical to the
+  // request. Treating absence as "granted nothing" would refuse a good
+  // authorization and tell the user they declined what they just approved.
+  it('treats an absent scope as granted-as-requested, not as empty', () => {
+    expect(hasRequiredScopes(null)).toBe(true);
+    expect(hasRequiredScopes(undefined)).toBe(true);
+    expect(hasRequiredScopes('')).toBe(true);
+    expect(hasRequiredScopes('   ')).toBe(true);
+  });
+
+  it('tolerates comma delimiters, since providers are inconsistent', () => {
+    expect(hasRequiredScopes('account:read,posts:read,offline_access')).toBe(true);
+    expect(hasRequiredScopes('account:read, posts:read')).toBe(true);
+  });
+});
+
+describe('token response scope normalisation', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('reports an omitted or blank scope as null rather than an empty string', async () => {
+    vi.stubGlobal('fetch', async () => jsonResponse({ access_token: 'at', refresh_token: 'rt' }));
+    expect((await exchangeCode(CONFIG, 'c', 'v')).scope).toBeNull();
+
+    vi.stubGlobal('fetch', async () =>
+      jsonResponse({ access_token: 'at', refresh_token: 'rt', scope: '  ' }),
+    );
+    expect((await exchangeCode(CONFIG, 'c', 'v')).scope).toBeNull();
   });
 });
 

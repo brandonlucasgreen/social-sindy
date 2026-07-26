@@ -95,7 +95,8 @@ export interface BufferTokenResponse {
   /** Null only if Buffer declines to issue one, which means no background sync. */
   refreshToken: string | null;
   expiresInSeconds: number;
-  scope: string;
+  /** Null when Buffer omitted it, which per RFC 6749 means "as requested". */
+  scope: string | null;
 }
 
 async function postToken(
@@ -140,7 +141,7 @@ async function postToken(
     accessToken: data.access_token,
     refreshToken: data.refresh_token ?? null,
     expiresInSeconds: data.expires_in ?? 3600,
-    scope: data.scope ?? '',
+    scope: data.scope?.trim() || null,
   };
 }
 
@@ -182,8 +183,23 @@ export function refreshAccessToken(
   );
 }
 
-/** True when the granted scopes still cover what the calendar needs to read. */
-export function hasRequiredScopes(scope: string): boolean {
-  const granted = new Set(scope.split(/\s+/).filter(Boolean));
+/**
+ * True when the granted scopes cover what the calendar needs to read.
+ *
+ * **Absent means granted.** RFC 6749 §5.1 makes `scope` optional in a token
+ * response when it is identical to what was requested, so plenty of providers
+ * omit it entirely. Treating a missing value as "granted nothing" would reject
+ * a perfectly good authorization and tell the user they declined permissions
+ * they had just approved — a failure with no plausible diagnosis from the
+ * outside. Only an explicitly-returned, explicitly-insufficient scope is a
+ * refusal.
+ *
+ * Delimiter is whitespace per the spec, but commas are tolerated because
+ * providers are inconsistent about it and a false rejection is expensive.
+ */
+export function hasRequiredScopes(scope: string | null | undefined): boolean {
+  if (!scope || !scope.trim()) return true;
+
+  const granted = new Set(scope.split(/[\s,]+/).filter(Boolean));
   return granted.has('account:read') && granted.has('posts:read');
 }

@@ -21,6 +21,7 @@ import { BufferAuthError, BufferClient, BufferRateLimitError } from '../buffer/c
 import { bufferOAuthConfig } from '../buffer/config.js';
 import {
   authorizationUrl,
+  BUFFER_SCOPES,
   createPkcePair,
   exchangeCode,
   hasRequiredScopes,
@@ -328,7 +329,9 @@ authRoutes.get('/auth/callback', async (c) => {
     c.env.DB,
     user.id,
     await sealSecret(tokens.refreshToken, c.env.ENCRYPTION_KEY),
-    { scope: tokens.scope },
+    // Record what we asked for when Buffer declines to say, so the stored row
+    // always describes the grant rather than holding an empty string.
+    { scope: tokens.scope ?? BUFFER_SCOPES.join(' ') },
   );
 
   // Upgrading from a pasted key: drop it rather than leaving a full-access
