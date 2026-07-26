@@ -509,6 +509,11 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
         </footer>
       </div>
       <script dangerouslySetInnerHTML={{ __html: COPY_SCRIPT }} />
+      <script
+        data-goatcounter="https://social-cally.goatcounter.com/count"
+        async
+        src="//gc.zgo.at/count.js"
+      />
     </body>
   </html>
 );
