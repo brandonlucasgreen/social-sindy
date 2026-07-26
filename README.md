@@ -395,11 +395,20 @@ explicit "delete the Google calendar" action.
 
 ## Still to do
 
-- **Buffer OAuth.** Registered but not yet wired into `src/routes/auth.tsx`;
-  users still paste an API key.
-- **No `sent` post appears** if Buffer recorded no `dueAt` for it,   since the feed filters on `dueAt` server-side to avoid fetching and discarding
-  unscheduled drafts.
+- **The Google Calendar push** is built but not switched on. `GOOGLE_CLIENT_ID`
+  stays commented out in `wrangler.toml` until Google's OAuth verification
+  clears, because a consent screen still in *Testing* expires refresh tokens
+  after seven days — the push would break weekly for anyone who enabled it. The
+  ICS feed is the product and works regardless; the push UI simply stays hidden.
+  See [docs/google-verification.md](docs/google-verification.md).
+
+## Known limitations
+
+Neither of these is pending work. They are consequences of choices made
+elsewhere, recorded here so they are not rediscovered as bugs.
+
+- **No `sent` post appears** if Buffer recorded no `dueAt` for it, since the feed
+  filters on `dueAt` server-side to avoid fetching and discarding unscheduled
+  drafts.
 - **The post permalink** (`publish.buffer.com/post/<id>`) is best-effort — Buffer
   does not document a canonical one.
-- **The privacy policy** has bracketed placeholders for the operator name and
-  contact address, which must be filled in before anyone else uses this.
