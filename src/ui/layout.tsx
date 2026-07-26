@@ -93,7 +93,7 @@ body {
   margin: 0;
   background: var(--ground);
   color: var(--text);
-  font-family: Figtree, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "SN Pro", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: clamp(1rem, 0.96rem + 0.22vi, 1.125rem);
   line-height: 1.5;
   letter-spacing: 0.0075em;
@@ -475,7 +475,7 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
       <link
         rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=SN+Pro:wght@400;500;600;700&display=swap"
       />
       <style dangerouslySetInnerHTML={{ __html: STYLES }} />
     </head>

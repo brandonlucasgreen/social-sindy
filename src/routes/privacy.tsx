@@ -147,7 +147,7 @@ privacyRoutes.get('/privacy', (c) =>
           tool creates.
         </li>
         <li>
-          <strong>Google Fonts</strong> — pages load the Figtree typeface from{' '}
+          <strong>Google Fonts</strong> — pages load the SN Pro typeface from{' '}
           <code>fonts.googleapis.com</code>, which means your browser contacts Google and reveals
           your IP address when you load a page. Nothing else about you is sent, and this happens on
           the interface pages only, never on the calendar feed itself.

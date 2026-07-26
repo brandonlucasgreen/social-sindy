@@ -3,6 +3,17 @@ main = "src/index.tsx"
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Custom Domain, not a route: Cloudflare creates the proxied DNS record and
+# provisions the certificate itself. A hand-made CNAME to workers.dev would not
+# route here.
+#
+# Declaring any route turns `workers_dev` off by default, so the old
+# *.workers.dev origin is now dead and this is the only way in. That is
+# deliberate — one origin means one OAuth redirect URI and one feed hostname.
+[[routes]]
+pattern = "cally.bgreen.lol"
+custom_domain = true
+
 # Feed responses are cached here so that repeated calendar-client polls do not
 # each spend a request against the user's Buffer rate-limit quota.
 [[kv_namespaces]]
@@ -23,7 +34,7 @@ crons = ["*/5 * * * *"]
 [vars]
 # Public base URL, used to build the feed URLs shown to the user and the OAuth
 # redirect URI. Must match the deployed origin exactly.
-APP_BASE_URL = "https://social-cally.brandonlucasgreen.workers.dev"
+APP_BASE_URL = "https://cally.bgreen.lol"
 
 # Google OAuth client ID for the optional Calendar push. Leave unset to run
 # without it — the ICS feed works regardless and the push UI is hidden.

@@ -60,13 +60,17 @@ on telling two hues apart. The network name is still exposed via `title`.
 
 ## Type
 
-`Figtree` for everything, self-described weight range 400–700. Buffer sets
-headings in `Stolzl`, which is proprietary and unavailable to us; Figtree is
-Buffer's real body face, so using it throughout is faithful rather than a
-substitution.
+`SN Pro` for everything, weights 400–700, from Google Fonts.
+
+This is a deliberate step away from Buffer's own type. The tool is third-party
+and unaffiliated, so it should not read as Buffer-issued — SN Pro is the face
+used across `bgreen.lol`, which places this in its author's world rather than
+Buffer's. The palette and layout still take cues from the product it reads from,
+which is honest: it is a companion to Buffer, and looking like a stranger to it
+would serve nobody. Typography is where the authorship line gets drawn.
 
 The signature is **large headings at regular-to-medium weight with tight negative
-tracking**, not bold headings. Buffer's own `--font-weight-heading` is `400`.
+tracking**, not bold headings.
 
 - Headings: 500 weight, `-0.02em` tracking, `1.1` line height
 - Body: 400, `1.5`, secondary text tinted from the teal hue — never gray

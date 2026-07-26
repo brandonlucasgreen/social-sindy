@@ -66,16 +66,21 @@ each with different refresh behaviour that the product has to account for.
 ## Brand Commitments
 
 Named social-cally. Deliberately **brand-adjacent and clearly third-party**: it may
-use Buffer's colour, type, shape, and shadow language so it feels native to the
-ecosystem, but must not use the Buffer logo or wordmark, and must carry an honest
-signal that it is unofficial. A third-party tool that holds other people's OAuth
-tokens while presenting itself as first-party would be a trust problem.
+echo Buffer's colour, shape, and shadow language so it feels native to the
+ecosystem, but must not use the Buffer logo or wordmark, must not use Buffer's
+typeface, and must carry an honest signal that it is unofficial. A third-party
+tool that holds other people's OAuth tokens while presenting itself as
+first-party would be a trust problem.
+
+Type is where authorship is signalled: the interface is set in `SN Pro`, the
+author's own face, not Buffer's `Figtree`. See [DESIGN.md](DESIGN.md).
 
 ## Evidence on Hand
 
-- Buffer's public design tokens, read from buffer.com: `Figtree` (body) and
-  `Stolzl` (headings, proprietary), the brand palette, fluid type and space
-  scales, radii, shadows, and per-network brand colours.
+- Buffer's public design tokens, read from buffer.com: the brand palette, fluid
+  type and space scales, radii, shadows, and per-network brand colours. Their
+  type (`Figtree` body, proprietary `Stolzl` headings) was read but deliberately
+  not adopted.
 - Real scheduled and published posts from a live Buffer account, used verbatim as
   test fixtures (`test/ics-roundtrip.test.ts`).
 - No testimonials, user counts, customer logos, uptime figures, or pricing exist.
