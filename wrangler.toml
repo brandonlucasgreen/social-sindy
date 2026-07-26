@@ -28,6 +28,14 @@ database_id = "eeb8eac6-1ac5-4a07-aa91-58a34120146e"
 # Drives the Google Calendar push. Fires often; each calendar's own refresh
 # interval decides whether it is actually due, so a once-a-day calendar is not
 # synced every five minutes.
+# Persisted, queryable logs. Without this the only way to see a failure is to be
+# running `wrangler tail` at the moment it happens, which is no use when a user
+# reports something that broke an hour ago. Sampling stays at 1.0 because the
+# traffic here is tiny and a sampled-away error is the one you needed.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 [triggers]
 crons = ["*/5 * * * *"]
 
