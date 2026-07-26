@@ -72,32 +72,16 @@ before it reaches the database, and never logged or returned in a response body.
 Swapping in OAuth replaces `src/routes/auth.tsx` without touching
 the rest of the app: everything downstream needs only a user and a credential.
 
-## Setup
+## Local development
 
-```bash
-pnpm install
-```
-
-Create the D1 database and KV namespace, then put the returned IDs into
-`wrangler.toml` (it ships with `PLACEHOLDER_REPLACE_AFTER_CREATE`):
-
-```bash
-npx wrangler d1 create buffer-cally
-```
-
-```bash
-npx wrangler kv namespace create FEED_CACHE
-```
-
-Generate a 32-byte encryption key:
+No Cloudflare account is needed for this — `wrangler dev` emulates D1 and KV on
+disk. Generate a key:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-### Local development
-
-Put the key in `.dev.vars` (gitignored):
+Put it in `.dev.vars` (gitignored), which is the whole local config:
 
 ```
 ENCRYPTION_KEY=<base64 32 bytes>
@@ -105,10 +89,10 @@ APP_BASE_URL=http://localhost:8787
 ```
 
 ```bash
-pnpm db:migrate:local && pnpm dev
+pnpm install && pnpm db:migrate:local && pnpm dev
 ```
 
-### Deploy
+## Deploy
 
 Runs on Cloudflare Workers. Netlify is not an option without a rewrite: the app
 uses D1 and KV bindings directly, so moving hosts means replacing the whole
@@ -120,12 +104,22 @@ storage layer with an external database.
 npx wrangler login
 ```
 
-**2. Create the storage** and paste the returned IDs into `wrangler.toml`, which
-ships with `PLACEHOLDER_REPLACE_AFTER_CREATE` in both slots:
+**2. Create the storage** and paste the returned IDs into `wrangler.toml`:
 
 ```bash
 npx wrangler d1 create buffer-cally && npx wrangler kv namespace create FEED_CACHE
 ```
+
+If you lose that output, the IDs are not gone and the resources should not be
+recreated — `create` is just the first place they are printed, not the only one:
+
+```bash
+npx wrangler d1 list && npx wrangler kv namespace list
+```
+
+Both IDs belong in version control. They are account-scoped resource handles,
+not credentials; reaching the data behind them still requires an authenticated
+token. The real secrets go through `wrangler secret put` and never appear here.
 
 **3. Set the encryption secret.** Use a *different* key from your local one:
 
@@ -134,10 +128,10 @@ npx wrangler secret put ENCRYPTION_KEY
 ```
 
 **4. Deploy once to learn your origin.** Cloudflare assigns
-`https://buffer-cally.<your-subdomain>.workers.dev`:
+`https://buffer-cally.<your-subdomain>.workers.dev` (this deployment: `buffer-cally.brandonlucasgreen.workers.dev`):
 
 ```bash
-pnpm db:migrate:remote && pnpm deploy
+pnpm db:migrate:remote && pnpm release
 ```
 
 **5. Set `APP_BASE_URL`** in `wrangler.toml` to that exact origin and deploy
@@ -153,14 +147,14 @@ Buffer requires a **public HTTPS redirect URI**, so this only works once
 deployed. Register a client under Buffer → Settings → API with:
 
 ```
-https://buffer-cally.<your-subdomain>.workers.dev/auth/callback
+https://buffer-cally.brandonlucasgreen.workers.dev/auth/callback
 ```
 
 A Worker can hold a secret, so register a **confidential** client and keep PKCE
 as well. Remember that Buffer rotates the refresh token on every use — see
 [Authentication](#authentication).
 
-### Google Calendar push (optional)
+### Enabling the Google push
 
 Skip this and the ICS feed still works; the push UI simply stays hidden.
 
@@ -171,7 +165,7 @@ Skip this and the ICS feed still works; the push UI simply stays hidden.
    *Testing*, add yourself as a test user; publishing it for other people
    requires Google verification.
 3. Create an **OAuth client ID** of type *Web application* with redirect URI
-   `https://buffer-cally.<your-subdomain>.workers.dev/google/callback`.
+   `https://buffer-cally.brandonlucasgreen.workers.dev/google/callback`.
 4. Put the client ID in `wrangler.toml` under `[vars]` as `GOOGLE_CLIENT_ID`, and
    set the secret:
 
@@ -182,9 +176,6 @@ npx wrangler secret put GOOGLE_CLIENT_SECRET
 For local development, add both to `.dev.vars` and register
 `http://localhost:8787/google/callback` as an additional redirect URI. Google
 permits localhost redirects; Buffer does not.
-
-`APP_BASE_URL` must match the deployed origin — it is what the feed URLs shown
-to users are built from.
 
 ## Tests
 

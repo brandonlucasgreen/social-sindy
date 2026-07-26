@@ -7,12 +7,12 @@ compatibility_flags = ["nodejs_compat"]
 # each spend a request against the user's Buffer rate-limit quota.
 [[kv_namespaces]]
 binding = "FEED_CACHE"
-id = "PLACEHOLDER_REPLACE_AFTER_CREATE"
+id = "359e9d98dbf94c20b2fdaae903caa471"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "buffer-cally"
-database_id = "PLACEHOLDER_REPLACE_AFTER_CREATE"
+database_id = "4d75d702-8ab7-4b9e-8c93-db61d6cbaf7d"
 
 # Drives the Google Calendar push. Fires often; each calendar's own refresh
 # interval decides whether it is actually due, so a once-a-day calendar is not
@@ -23,7 +23,7 @@ crons = ["*/5 * * * *"]
 [vars]
 # Public base URL, used to build the feed URLs shown to the user and the OAuth
 # redirect URI. Must match the deployed origin exactly.
-APP_BASE_URL = "http://localhost:8787"
+APP_BASE_URL = "https://buffer-cally.brandonlucasgreen.workers.dev"
 
 # Google OAuth client ID for the optional Calendar push. Leave unset to run
 # without it — the ICS feed works regardless and the push UI is hidden.
@@ -32,4 +32,3 @@ APP_BASE_URL = "http://localhost:8787"
 # Secrets (set with `wrangler secret put <NAME>`, never committed):
 #   ENCRYPTION_KEY       - base64 32-byte AES-256-GCM key, wraps stored credentials
 #   GOOGLE_CLIENT_SECRET - Google OAuth client secret, only needed for the push
-#   SESSION_SECRET - random string, signs session cookies
