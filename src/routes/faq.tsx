@@ -69,7 +69,8 @@ faqRoutes.get('/faq', (c) => {
   const user = c.get('user');
   return c.html(
     <Layout title="FAQ — social sindy" user={user}>
-      <h1>Who is it for?</h1>
+      <h1>Frequently asked questions</h1>
+      <h2>Who is this for?</h2>
       <p class="lede" style="margin-bottom:2rem">
         Anyone who publishes through Buffer and wants their posts somewhere other than Buffer's dashboard.
       </p>
@@ -83,7 +84,7 @@ faqRoutes.get('/faq', (c) => {
         ))}
       </div>
 
-      <h2>Frequently asked questions</h2>
+      <h2>Common questions</h2>
       {FAQ.map((item, index) => (
         <div class="faq-item">
           <h3 id={`q${index + 1}`}>
