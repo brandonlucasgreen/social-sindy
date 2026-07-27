@@ -3,13 +3,16 @@ main = "src/index.tsx"
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Custom Domain: the merged product lives at social-sindy.bgreen.lol.
-# social-cally.bgreen.lol will redirect here once the merge is deployed.
+# Custom Domains: the merged product lives at socialsindy.com.
+[[routes]]
+pattern = "socialsindy.com"
+custom_domain = true
+
+# Legacy domains still active so existing ICS subscribers aren't broken.
 [[routes]]
 pattern = "social-sindy.bgreen.lol"
 custom_domain = true
 
-# Also serve from the old domain so existing ICS subscribers aren't broken.
 [[routes]]
 pattern = "social-cally.bgreen.lol"
 custom_domain = true
@@ -42,7 +45,7 @@ crons = ["*/5 * * * *"]
 [vars]
 # Public base URL, used to build the feed URLs shown to the user and the OAuth
 # redirect URI. Must match the deployed origin exactly.
-APP_BASE_URL = "https://social-sindy.bgreen.lol"
+APP_BASE_URL = "https://socialsindy.com"
 
 # Buffer OAuth client ID for "Sign in with Buffer". A client ID is public — it
 # ships in the redirect URL every user's browser follows — so it belongs here in

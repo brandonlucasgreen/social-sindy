@@ -29,7 +29,7 @@ describe('generateAtom', () => {
       feedId: 'out_1',
       name: 'Test Feed',
       subtitle: 'Test subtitle',
-      appUrl: 'https://social-sindy.bgreen.lol',
+      appUrl: 'https://socialsindy.com',
       feedToken: 'abc123',
       groupCrossPosts: false,
     });
@@ -50,7 +50,7 @@ describe('generateAtom', () => {
     const xml = generateAtom(posts, channels, {
       feedId: 'out_1',
       name: 'Test Feed',
-      appUrl: 'https://social-sindy.bgreen.lol',
+      appUrl: 'https://socialsindy.com',
       feedToken: 'abc123',
       groupCrossPosts: false,
     });
@@ -76,7 +76,7 @@ describe('generateAtom', () => {
     const xml = generateAtom(posts, channels, {
       feedId: 'out_1',
       name: 'Test Feed',
-      appUrl: 'https://social-sindy.bgreen.lol',
+      appUrl: 'https://socialsindy.com',
       feedToken: 'abc123',
       groupCrossPosts: true,
     });
@@ -99,7 +99,7 @@ describe('generateAtom', () => {
     const xml = generateAtom(posts, channels, {
       feedId: 'out_1',
       name: 'Test Feed',
-      appUrl: 'https://social-sindy.bgreen.lol',
+      appUrl: 'https://socialsindy.com',
       feedToken: 'abc123',
       groupCrossPosts: false,
     });
@@ -115,12 +115,12 @@ describe('generateAtom', () => {
     const xml = generateAtom(posts, channels, {
       feedId: 'out_1',
       name: 'Test Feed',
-      appUrl: 'https://social-sindy.bgreen.lol',
+      appUrl: 'https://socialsindy.com',
       feedToken: 'secret_token_123',
       groupCrossPosts: false,
     });
 
-    expect(xml).toContain('href="https://social-sindy.bgreen.lol/feed/secret_token_123.xml"');
+    expect(xml).toContain('href="https://socialsindy.com/feed/secret_token_123.xml"');
     expect(xml).toContain('rel="self"');
   });
 
@@ -128,7 +128,7 @@ describe('generateAtom', () => {
     const xml = generateAtom([], new Map(), {
       feedId: 'out_1',
       name: 'Empty Feed',
-      appUrl: 'https://social-sindy.bgreen.lol',
+      appUrl: 'https://socialsindy.com',
       feedToken: 'abc123',
       groupCrossPosts: false,
     });

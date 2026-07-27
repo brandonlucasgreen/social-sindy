@@ -126,7 +126,7 @@ function envWith(db: ReturnType<typeof fakeD1>, kv: ReturnType<typeof fakeKV>) {
     DB: db as never,
     FEED_CACHE: kv as never,
     ENCRYPTION_KEY: KEY,
-    APP_BASE_URL: 'https://social-cally.bgreen.lol',
+    APP_BASE_URL: 'https://socialsindy.com',
     BUFFER_CLIENT_ID: 'client-abc',
     BUFFER_CLIENT_SECRET: 'secret-xyz',
   } as never;
@@ -157,7 +157,7 @@ async function parkState(kv: ReturnType<typeof fakeKV>, forceConsent = true) {
 }
 
 function callback(query: string, env: ReturnType<typeof envWith>) {
-  return authRoutes.request(`https://social-cally.bgreen.lol/auth/callback?${query}`, {}, env);
+  return authRoutes.request(`https://socialsindy.com/auth/callback?${query}`, {}, env);
 }
 
 describe('/auth/buffer', () => {
@@ -166,7 +166,7 @@ describe('/auth/buffer', () => {
   it('asks for the approval screen, which is what makes the grant durable', async () => {
     const kv = fakeKV();
     const response = await authRoutes.request(
-      'https://social-cally.bgreen.lol/auth/buffer',
+      'https://socialsindy.com/auth/buffer',
       {},
       envWith(fakeD1(), kv),
     );
