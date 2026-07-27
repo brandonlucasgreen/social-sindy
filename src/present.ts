@@ -103,6 +103,16 @@ export function serviceEmoji(service: string): string {
   return SERVICE_EMOJI[service] ?? '📅';
 }
 
+/** XML-escape text content. */
+export function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 const EXCERPT_LIMIT = 60;
 
 /**
@@ -170,18 +180,52 @@ export function eventDescription(post: BufferPost, channel: ChannelRef | undefin
 
   const facts: string[] = [
     `Channel: ${channel?.name ?? '(unknown)'} (${serviceLabel(service)})`,
-    `Status: ${post.status}`,
   ];
+
+  // Prefer the publicly available social network URL over the Buffer publish URL
+  if (post.externalLink) {
+    facts.push(`Post: ${post.externalLink}`);
+  } else {
+    facts.push(`Open in Buffer: ${bufferPostUrl(post.id)}`);
+  }
+
   if (post.tags.length) facts.push(`Tags: ${post.tags.map((t) => t.name).join(', ')}`);
   if (post.assets.length) {
     const kinds = post.assets.map((a) => a.type ?? 'attachment');
     facts.push(`Media: ${post.assets.length} (${[...new Set(kinds)].join(', ')})`);
   }
   if (post.error) facts.push(`Error: ${post.error.message}`);
-  facts.push(`Open in Buffer: ${bufferPostUrl(post.id)}`);
 
   sections.push(facts.join('\n'));
   return sections.join('\n\n');
+}
+
+/** HTML variant of eventDescription for Atom feeds, where \n renders as a space. */
+export function eventDescriptionHtml(post: BufferPost, channel: ChannelRef | undefined): string {
+  const service = channel?.service ?? post.channelService;
+  const sections: string[] = [];
+
+  if (post.text?.trim()) sections.push(escapeXml(post.text.trim()));
+
+  const facts: string[] = [
+    `Channel: ${escapeXml(channel?.name ?? '(unknown)')} (${escapeXml(serviceLabel(service))})`,
+  ];
+
+  if (post.externalLink) {
+    facts.push(`<a href="${escapeXml(post.externalLink)}">View on ${escapeXml(serviceLabel(service))}</a>`);
+  } else {
+    facts.push(`<a href="${escapeXml(bufferPostUrl(post.id))}">Open in Buffer</a>`);
+  }
+
+  if (post.tags.length) facts.push(`Tags: ${post.tags.map((t) => escapeXml(t.name)).join(', ')}`);
+  if (post.assets.length) {
+    const kinds = post.assets.map((a) => a.type ?? 'attachment');
+    facts.push(`Media: ${post.assets.length} (${[...new Set(kinds)].join(', ')})`);
+  }
+  if (post.error) facts.push(`Error: ${escapeXml(post.error.message)}`);
+
+  sections.push(facts.join('<br>'));
+  return sections.join('<br><br>');
 }
 
 /** The instant a post occupies on the calendar, or null if it has none. */

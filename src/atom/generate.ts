@@ -16,25 +16,16 @@
 import type { BufferPost } from '../buffer/types.js';
 import {
   eventTitle,
-  eventDescription,
+  eventDescriptionHtml,
   resolveChannel,
   serviceLabel,
+  escapeXml,
   type ChannelRef,
 } from '../present.js';
 
 export type { ChannelRef };
 
 const ATOM_NS = 'http://www.w3.org/2005/Atom';
-
-/** XML-escape text content. */
-function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
 
 /** Format a Date as an ISO 8601 / RFC 3339 timestamp for Atom. */
 function iso8601(date: Date): string {
@@ -145,9 +136,9 @@ function emitEntry(
     lines.push(`    <category term="${escapeXml(tag.name)}"/>`);
   }
 
-  // Full post text as content
-  const description = eventDescription(post, channels[0]);
-  lines.push(`    <content type="html">${escapeXml(description)}</content>`);
+  // Full post text as HTML content
+  const description = eventDescriptionHtml(post, channels[0]);
+  lines.push(`    <content type="html">${description}</content>`);
 
   // Media attachments
   for (const asset of post.assets) {
