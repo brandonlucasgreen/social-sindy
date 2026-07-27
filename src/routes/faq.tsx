@@ -11,29 +11,6 @@ export const faqRoutes = new Hono<AppBindings>();
 
 faqRoutes.use('*', withUser);
 
-const USE_CASES = [
-  {
-    icon: '📅',
-    title: 'Team calendar',
-    desc: 'Add your content schedule to a shared Google Calendar or Outlook so the whole team can see what\'s coming up — without logging into Buffer.',
-  },
-  {
-    icon: '✉️',
-    title: 'RSS to email',
-    desc: 'Pipe the feed into Buttondown, Mailchimp, or FeedMail and every post becomes an email send. No manual work.',
-  },
-  {
-    icon: '📖',
-    title: 'Personal journal',
-    desc: 'Subscribe in Reeder, NetNewsWire, or your favorite RSS app and revisit your posts in a clean, reader-like view.',
-  },
-  {
-    icon: '🌐',
-    title: 'Website widget',
-    desc: 'Embed a cross-network feed on your site — every channel in one place, not separate widgets for each social network.',
-  },
-];
-
 const FAQ = [
   {
     q: 'What does it do?',
@@ -44,8 +21,8 @@ const FAQ = [
     a: `Only your channels and your scheduled or published posts. Nothing else — no analytics, no comments, no DMs. And the OAuth scope is read-only, so it can never post on your behalf.`,
   },
   {
-    q: 'What\'s the difference between ICS and Atom?',
-    a: `ICS is for calendars — each post becomes a timed event on your calendar with a start time and duration. Atom is for feeds — each post becomes an entry with the full text and links, readable in any RSS app or email tool. You can create both from the same Buffer connection.`,
+    q: "What's the difference between ICS and Atom?",
+    a: `ICS is for calendars — each post becomes a timed event with a start time and duration. Atom is for feeds — each post becomes an entry with the full text and links, readable in any RSS app or email tool. You can create both from the same Buffer connection.`,
   },
   {
     q: 'How often does it refresh?',
@@ -57,11 +34,11 @@ const FAQ = [
   },
   {
     q: 'Can I delete my account?',
-    a: `Yes. From your dashboard, there\'s a "Delete account" option that removes everything immediately. You can also revoke the connection from your Buffer settings at any time.`,
+    a: `Yes. From your dashboard, there's a "Delete account" option that removes everything immediately. You can also revoke the connection from your Buffer settings at any time.`,
   },
   {
     q: 'Who made this?',
-    a: `Social Sindy is made by <a href="https://bgreen.lol" target="_blank" rel="noopener noreferrer">Brandon Lucas Green</a>. It\'s not affiliated with Buffer, Inc.`,
+    a: `Social Sindy is made by <a href="https://bgreen.lol" target="_blank" rel="noopener noreferrer">Brandon Lucas Green</a>. It's not affiliated with Buffer, Inc.`,
   },
 ];
 
@@ -70,26 +47,11 @@ faqRoutes.get('/faq', (c) => {
   return c.html(
     <Layout title="FAQ — social sindy" user={user}>
       <h1>Frequently asked questions</h1>
-      <h2>Who is this for?</h2>
-      <p class="lede" style="margin-bottom:2rem">
-        Anyone who publishes through Buffer and wants their posts somewhere other than Buffer's dashboard.
-      </p>
-      <div class="use-cases">
-        {USE_CASES.map((uc) => (
-          <div class="use-case">
-            <div class="use-case-icon">{uc.icon}</div>
-            <h3>{uc.title}</h3>
-            <p>{uc.desc}</p>
-          </div>
-        ))}
-      </div>
-
-      <h2>Common questions</h2>
       {FAQ.map((item, index) => (
         <div class="faq-item">
-          <h3 id={`q${index + 1}`}>
+          <h2 id={`q${index + 1}`}>
             <a href={`#q${index + 1}`}>{item.q}</a>
-          </h3>
+          </h2>
           <div dangerouslySetInnerHTML={{ __html: item.a }} />
         </div>
       ))}

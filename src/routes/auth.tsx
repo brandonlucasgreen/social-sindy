@@ -152,6 +152,30 @@ function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
         One connection, both formats.
       </p>
 
+      <h2>What can it do?</h2>
+      <div class="use-cases">
+        <div class="use-case">
+          <div class="use-case-icon">📅</div>
+          <h3>Team calendar</h3>
+          <p>Add your content schedule to a shared Google Calendar or Outlook so the whole team can see what’s coming up — without logging into Buffer.</p>
+        </div>
+        <div class="use-case">
+          <div class="use-case-icon">✉️</div>
+          <h3>RSS to email</h3>
+          <p>Pipe the feed into Buttondown, Mailchimp, or FeedMail and every post becomes an email send. No manual work.</p>
+        </div>
+        <div class="use-case">
+          <div class="use-case-icon">📖</div>
+          <h3>Personal journal</h3>
+          <p>Subscribe in Reeder, NetNewsWire, or your favorite RSS app and revisit your posts in a clean, reader-like view.</p>
+        </div>
+        <div class="use-case">
+          <div class="use-case-icon">🌐</div>
+          <h3>Website widget</h3>
+          <p>Embed a cross-network feed on your site — every channel in one place, not separate widgets for each social network.</p>
+        </div>
+      </div>
+
       <HeroDemo />
 
       {error ? <Notice kind="error">{error}</Notice> : null}
@@ -219,10 +243,6 @@ function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
           <p>No post is created, edited, or deleted in your Buffer account.</p>
         </div>
       </div>
-
-      <p style="margin-top:1.5rem">
-        <a href="/faq">More questions? Read the FAQ</a>
-      </p>
     </Layout>
   );
 }
