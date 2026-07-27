@@ -48,7 +48,7 @@ APP_BASE_URL = "https://social-sindy.bgreen.lol"
 # ships in the redirect URL every user's browser follows — so it belongs here in
 # version control, not in secrets. Unset it and the connect page falls back to a
 # pasted personal API key.
-BUFFER_CLIENT_ID = "qkC-8N5SSTdhBBd2VNs78ddc1H0aLswbe9TR6UZA6D_"
+BUFFER_CLIENT_ID = "YTGCZGzgLoHaLz0pug6PAi4wROsUOKzXGYASd_phYCv"
 
 # Google OAuth client ID for the optional Calendar push. Leave unset to run
 # without it — the ICS feed works regardless and the push UI is hidden.
