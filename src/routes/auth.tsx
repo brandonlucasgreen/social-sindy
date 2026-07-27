@@ -63,12 +63,12 @@ const STATE_TTL_SECONDS = 600;
 
 /**
  * Illustrative sample content for the hero, not real account data. It exists to
- * show the actual output — network-coloured post chips laid across a week —
+ * show the actual output - network-coloured post chips laid across a week -
  * rather than describe it in prose.
  */
 const SAMPLE_WEEK: { day: string; today?: boolean; posts: { service: string; text: string }[] }[] = [
   { day: 'Mon', posts: [{ service: 'linkedin', text: 'Closing the laptop' }] },
-  { day: 'Tue', posts: [{ service: 'threads', text: 'Booze cruise idea' }, { service: 'bluesky', text: 'What are you…' }] },
+  { day: 'Tue', posts: [{ service: 'threads', text: 'Booze cruise idea' }, { service: 'bluesky', text: 'What are you...' }] },
   { day: 'Wed', today: true, posts: [{ service: 'instagram', text: '$0.003 a stream' }] },
   { day: 'Thu', posts: [{ service: 'mastodon', text: 'Buy direct' }] },
   { day: 'Fri', posts: [{ service: 'threads', text: 'Friday links' }, { service: 'youtube', text: 'New demo' }] },
@@ -79,7 +79,7 @@ const SAMPLE_WEEK: { day: string; today?: boolean; posts: { service: string; tex
 const HeroDemo = () => (
   <figure class="demo">
     <div class="demo-head">
-      <b>Buffer — Cult of Lightbulbs</b>
+      <b>Buffer - Cult of Lightbulbs</b>
       <span>This week</span>
     </div>
     <div class="week">
@@ -88,7 +88,7 @@ const HeroDemo = () => (
           <b>{day.day}</b>
           {day.posts.map((post) => (
             <div class="chip" style={`--net:${serviceColor(post.service)}`}>
-              <span title={`${serviceLabel(post.service)} — ${post.text}`}>{post.text}</span>
+              <span title={`${serviceLabel(post.service)} - ${post.text}`}>{post.text}</span>
             </div>
           ))}
         </div>
@@ -122,13 +122,13 @@ const ApiKeyForm = ({ labelled }: { labelled?: boolean }) => (
       <a href={KEY_SETTINGS_URL} target="_blank" rel="noreferrer noopener">
         Buffer → Settings → API
       </a>
-      . Connecting it also signs you in — there is no separate account.
+      . Connecting it also signs you in - there is no separate account.
     </small>
   </form>
 );
 
 /**
- * Shown wherever the key field is, including behind the disclosure — a warning
+ * Shown wherever the key field is, including behind the disclosure - a warning
  * about pasting a credential is worth nothing if it is not next to the box the
  * credential goes into.
  */
@@ -151,30 +151,6 @@ function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
         Apple Calendar, or Outlook — plus a content feed (Atom/RSS) for your blog or RSS reader.
         One connection, both formats.
       </p>
-
-      <h2>What can it do?</h2>
-      <div class="use-cases">
-        <div class="use-case">
-          <div class="use-case-icon">📅</div>
-          <h3>Team calendar</h3>
-          <p>Add your content schedule to a shared Google Calendar or Outlook so the whole team can see what’s coming up — without logging into Buffer.</p>
-        </div>
-        <div class="use-case">
-          <div class="use-case-icon">✉️</div>
-          <h3>RSS to email</h3>
-          <p>Pipe the feed into Buttondown, Mailchimp, or FeedMail and every post becomes an email send. No manual work.</p>
-        </div>
-        <div class="use-case">
-          <div class="use-case-icon">📖</div>
-          <h3>Personal journal</h3>
-          <p>Subscribe in Reeder, NetNewsWire, or your favorite RSS app and revisit your posts in a clean, reader-like view.</p>
-        </div>
-        <div class="use-case">
-          <div class="use-case-icon">🌐</div>
-          <h3>Website widget</h3>
-          <p>Embed a cross-network feed on your site — every channel in one place, not separate widgets for each social network.</p>
-        </div>
-      </div>
 
       <HeroDemo />
 
@@ -209,7 +185,31 @@ function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
         </>
       )}
 
-      <h2>What it can and cannot do</h2>
+      <h2>What can you use it for?</h2>
+      <div class="use-cases">
+        <div class="use-case">
+          <div class="use-case-icon">📅</div>
+          <h3>Team calendar</h3>
+          <p>Add your content schedule to a shared Google Calendar or Outlook so the whole team can see what's coming up — without logging into Buffer.</p>
+        </div>
+        <div class="use-case">
+          <div class="use-case-icon">✉️</div>
+          <h3>RSS to email</h3>
+          <p>Pipe the feed into Buttondown, Mailchimp, or FeedMail and every post becomes an email send. No manual work.</p>
+        </div>
+        <div class="use-case">
+          <div class="use-case-icon">📖</div>
+          <h3>Personal journal</h3>
+          <p>Subscribe in Reeder, NetNewsWire, or your favorite RSS app and revisit your posts in a clean, reader-like view.</p>
+        </div>
+        <div class="use-case">
+          <div class="use-case-icon">🌐</div>
+          <h3>Website widget</h3>
+          <p>Embed a cross-network feed on your site — every channel in one place, not separate widgets for each social network.</p>
+        </div>
+      </div>
+
+      <h2>How it works</h2>
       <div class="trust">
         <div>
           <h3>
@@ -328,7 +328,7 @@ authRoutes.get('/auth/callback', async (c) => {
     const description = c.req.query('error_description');
 
     // A server that will not take `prompt=consent` reports a malformed request,
-    // not a refusal — blaming the user for a parameter they never saw would be
+    // not a refusal - blaming the user for a parameter they never saw would be
     // both wrong and unactionable. Retry once without it. The retry records
     // `forceConsent: false`, so this cannot loop.
     const attempt = await consumeState(c, c.req.query('state'));
@@ -378,7 +378,7 @@ authRoutes.get('/auth/callback', async (c) => {
   }
 
   // Buffer omits the refresh token when it skips an approval screen the user
-  // has already given — which is exactly what signing in on a second device
+  // has already given - which is exactly what signing in on a second device
   // looks like. The grant already on file is untouched by that and still keeps
   // the calendar fresh, so this is an ordinary sign-in, not a failure. Only
   // when there is nothing to fall back on is the authorization really unusable.
