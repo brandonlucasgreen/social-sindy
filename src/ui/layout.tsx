@@ -4,7 +4,7 @@
  * chips — and connects Buffer to get a real one. One connection produces both
  * calendar (ICS) and content (Atom/RSS) feeds.
  *
- * OWN-WORLD: Warm cream ground with amber accent, sharing Buffer's structural
+ * OWN-WORLD: Steel blue ground with blue accent, sharing Buffer's structural
  * language (pill geometry, offset depth, SN Pro) in a warm colour family. The
  * broadcast-signal icon says "syndication" where cally's calendar pegs said
  * "schedule."
@@ -25,17 +25,17 @@ const STYLES = `
 :root {
   color-scheme: light dark;
 
-  --ground: hsl(40 33% 97%);
+  --ground: hsl(210 20% 97%);
   --raised: hsl(0 0% 100%);
-  --sunken: hsl(40 26% 94%);
-  --text: hsl(30 10% 16%);
-  --text-dim: hsl(30 8% 44%);
-  --border: hsl(30 12% 80%);
-  --border-soft: hsl(30 16% 88%);
-  --accent: hsl(35 85% 68%);
-  --accent-deep: hsl(35 75% 55%);
-  --link: hsl(25 80% 38%);
-  --edge: hsl(30 20% 18%);
+  --sunken: hsl(210 16% 94%);
+  --text: hsl(210 15% 16%);
+  --text-dim: hsl(210 10% 44%);
+  --border: hsl(210 12% 80%);
+  --border-soft: hsl(210 16% 88%);
+  --accent: hsl(210 55% 60%);
+  --accent-deep: hsl(210 60% 48%);
+  --link: hsl(210 70% 38%);
+  --edge: hsl(210 20% 18%);
 
   --warn-bg: hsl(40 100% 88%);
   --warn-edge: hsl(40 70% 41%);
@@ -51,27 +51,27 @@ const STYLES = `
   --dur: 150ms;
 
   --shadow-card:
-    0 -0.25rem 1.5rem -0.5rem hsl(30 15% 9% / 0.10),
-    0 0.25rem 0.5rem -0.25rem hsl(30 15% 9% / 0.10),
+    0 -0.25rem 1.5rem -0.5rem hsl(210 15% 9% / 0.10),
+    0 0.25rem 0.5rem -0.25rem hsl(210 15% 9% / 0.10),
     0 0.5rem 0 0 var(--edge);
   --shadow-raised:
-    0 0.25rem 0.75rem -0.125rem hsl(30 15% 9% / 0.10),
-    0 0 0.0625rem 0.0625rem hsl(30 15% 9% / 0.05);
+    0 0.25rem 0.75rem -0.125rem hsl(210 15% 9% / 0.10),
+    0 0 0.0625rem 0.0625rem hsl(210 15% 9% / 0.05);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ground: hsl(30 10% 14%);
-    --raised: hsl(30 8% 18%);
-    --sunken: hsl(30 12% 11%);
-    --text: hsl(40 30% 96%);
-    --text-dim: hsl(30 10% 70%);
-    --border: hsl(30 8% 30%);
-    --border-soft: hsl(30 6% 24%);
-    --accent: hsl(35 85% 68%);
-    --accent-deep: hsl(35 80% 58%);
-    --link: hsl(35 85% 68%);
-    --edge: hsl(30 15% 8%);
+    --ground: hsl(210 15% 14%);
+    --raised: hsl(210 12% 18%);
+    --sunken: hsl(210 16% 11%);
+    --text: hsl(210 20% 96%);
+    --text-dim: hsl(210 10% 70%);
+    --border: hsl(210 8% 30%);
+    --border-soft: hsl(210 6% 24%);
+    --accent: hsl(210 55% 65%);
+    --accent-deep: hsl(210 60% 55%);
+    --link: hsl(210 55% 65%);
+    --edge: hsl(210 15% 8%);
 
     --warn-bg: hsl(40 25% 18%);
     --warn-edge: hsl(40 45% 40%);
@@ -195,7 +195,7 @@ button, .btn {
   padding: 0.6875rem 1.375rem;
   border: 1px solid transparent; border-radius: var(--pill);
   /* Amber with DARK text — the warm palette's signature. */
-  background: var(--accent); color: hsl(30 10% 16%);
+  background: var(--accent); color: hsl(0 0% 100%);
   cursor: pointer; text-decoration: none; white-space: nowrap;
   transition: transform var(--dur) var(--ease), background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
@@ -227,7 +227,7 @@ button[disabled], .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform
 .fmt-btn + .fmt-btn { border-left: 1px solid var(--border); }
 .fmt-btn:hover { background: var(--sunken); color: var(--text); }
 .fmt-btn.active {
-  background: var(--accent); color: hsl(30 10% 16%);
+  background: var(--accent); color: hsl(0 0% 100%);
   box-shadow: inset 0 0 0 0; /* override any inset */
 }
 
@@ -268,7 +268,7 @@ button[disabled], .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform
   background: var(--border-soft); color: var(--text); font-size: 0.6875rem; font-weight: 600;
 }
 .step.on { color: var(--text); background: var(--accent); }
-.step.on i { background: hsl(30 10% 16%); color: var(--accent); }
+.step.on i { background: hsl(0 0% 100%); color: var(--accent); }
 .step.done i { background: var(--link); color: var(--ground); }
 
 /* --- channels ----------------------------------------------------------- */
