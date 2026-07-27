@@ -24,9 +24,13 @@ export interface ChannelRef {
   service: string;
 }
 
-/** Presentation options common to both output formats. */
+/** Presentation options shared across output formats.
+ *
+ * `eventDurationMinutes` is ICS-only (Atom doesn't have durations); it's
+ * optional here so the Atom renderer can call `eventTitle` without
+ * supplying a value it doesn't need. The ICS renderer always passes it. */
 export interface PresentOptions {
-  eventDurationMinutes: number;
+  eventDurationMinutes?: number;
   showChannelInTitle: boolean;
 }
 
@@ -188,6 +192,6 @@ export function postInstant(post: BufferPost): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export function postEnd(start: Date, options: PresentOptions): Date {
-  return new Date(start.getTime() + options.eventDurationMinutes * 60_000);
+export function postEnd(start: Date, durationMinutes: number): Date {
+  return new Date(start.getTime() + durationMinutes * 60_000);
 }

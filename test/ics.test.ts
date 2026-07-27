@@ -207,8 +207,8 @@ describe('generateIcs', () => {
     const a = generateIcs([post()], channels, options, NOW);
     const b = generateIcs([post()], channels, { ...options, calendarId: 'cal_xyz' }, NOW);
 
-    expect(a).toContain('UID:post_1.cal_abc@social-cally');
-    expect(b).toContain('UID:post_1.cal_xyz@social-cally');
+    expect(a).toContain('UID:post_1.cal_abc@social-sindy');
+    expect(b).toContain('UID:post_1.cal_xyz@social-sindy');
   });
 
   it('titles events with channel name and service emoji', () => {

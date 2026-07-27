@@ -54,13 +54,14 @@ function channelRefs(output: OutputWithChannels): Map<string, ChannelRef> {
   );
 }
 
-/** Renders the feed, preferring cache and falling back to the last good copy. */
+/** Renders the feed for this output, dispatching to ICS or Atom based on format. */
 export function buildFeed(
   env: Env,
   output: OutputWithChannels,
   now: Date = new Date(),
 ): Promise<FeedResult> {
-  return cachedFeed(env, output, () => renderFromBuffer(env, output, now));
+  const renderer = output.format === 'atom' ? renderAtom : renderIcs;
+  return cachedFeed(env, output, () => renderer(env, output, now));
 }
 
 /**

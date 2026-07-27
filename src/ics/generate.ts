@@ -77,7 +77,7 @@ export function generateIcs(
     if (!Number.isNaN(modified.getTime())) writer.add('LAST-MODIFIED', formatUtc(modified));
 
     writer.add('DTSTART', formatUtc(start));
-    writer.add('DTEND', formatUtc(postEnd(start, options)));
+    writer.add('DTEND', formatUtc(postEnd(start, options.eventDurationMinutes ?? 15)));
     writer.add('SUMMARY', escapeText(eventTitle(post, channel, options)));
     writer.add('DESCRIPTION', escapeText(eventDescription(post, channel)));
     writer.add('URL', bufferPostUrl(post.id));
