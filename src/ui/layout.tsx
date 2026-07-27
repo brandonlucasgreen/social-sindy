@@ -424,13 +424,33 @@ button[disabled], .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform
   .day:has(> b:only-child) { display: none; }
 }
 
+/* --- use cases ---------------------------------------------------------- */
+
+.use-cases {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+.use-case {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+}
+.use-case-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+.use-case h3 { font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.375rem; }
+.use-case p { font-size: 0.8125rem; line-height: 1.5; color: var(--text-dim); margin: 0; }
+
 /* --- faq --------------------------------------------------------------- */
 
-.faq-item { margin-bottom: 2rem; }
-.faq-item h2 { font-size: 1.0625rem; font-weight: 600; margin-bottom: 0.5rem; }
-.faq-item h2 a { color: var(--text); text-decoration: none; }
-.faq-item h2 a:hover { text-decoration: underline; }
-.faq-item p { margin-bottom: 0.75rem; max-width: 68ch; }
+.faq-item { margin-bottom: 1.75rem; }
+.faq-item h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.375rem; }
+.faq-item h3 a { color: var(--text); text-decoration: none; }
+.faq-item h3 a:hover { text-decoration: underline; }
+.faq-item p { margin-bottom: 0.5rem; max-width: 68ch; }
 .faq-item ul { max-width: 68ch; margin-bottom: 0.75rem; padding-left: 1.25rem; }
 .faq-item li { margin-bottom: 0.5rem; }
 
