@@ -212,6 +212,22 @@ button[disabled], .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform
 .btn-row { display: flex; gap: 0.625rem; align-items: center; flex-wrap: wrap; }
 .btn-row form { display: contents; }
 
+/* --- format toggle (ICS / Atom) ---------------------------------------- */
+
+.format-toggle { display: flex; gap: 0; border-radius: var(--pill); overflow: hidden; border: 1px solid var(--border); }
+.fmt-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0.5rem 1.25rem; font: inherit; font-size: 0.9375rem; font-weight: 600;
+  color: var(--text-dim); background: var(--raised); text-decoration: none;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.fmt-btn + .fmt-btn { border-left: 1px solid var(--border); }
+.fmt-btn:hover { background: var(--sunken); color: var(--text); }
+.fmt-btn.active {
+  background: var(--accent); color: hsl(30 10% 16%);
+  box-shadow: inset 0 0 0 0; /* override any inset */
+}
+
 /* Buffer's email-capture shape: one pill holding field and action together. */
 .inline-form {
   display: flex; gap: 0.5rem; align-items: center;

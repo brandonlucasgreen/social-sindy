@@ -1,8 +1,8 @@
 /**
- * Creating, viewing, and managing outputs (ICS or Atom feeds).
+ * Creating, viewing, and managing sindies (ICS or Atom feeds).
  *
  * Replaces the old calendars.tsx and feeds.tsx with a unified management UI
- * where the user picks a format (ICS or Atom) when creating an output.
+ * where the user picks a format (ICS or Atom) when creating a sindy.
  */
 
 import { Hono } from 'hono';
@@ -35,8 +35,8 @@ import {
 
 export const outputRoutes = new Hono<AppBindings>();
 
-outputRoutes.use('/outputs', requireUser);
-outputRoutes.use('/outputs/*', requireUser);
+outputRoutes.use('/sindies', requireUser);
+outputRoutes.use('/sindies/*', requireUser);
 
 // -- form option sets -------------------------------------------------------
 
@@ -100,7 +100,7 @@ function pickNumber(value: string, allowed: readonly number[], fallback: number)
   return allowed.includes(parsed) ? parsed : fallback;
 }
 
-interface OutputSettings {
+interface SindySettings {
   name: string;
   channelIds: string[];
   format: OutputFormat;
@@ -108,18 +108,53 @@ interface OutputSettings {
   showChannelInTitle: boolean;
   maxItems: number;
   groupCrossPosts: boolean;
+  includeDrafts: boolean;
   refreshMinutes: number;
   windowPastDays: number;
   windowFutureDays: number;
   statuses: PostStatus[];
 }
 
-function readSettings(body: ParsedBody, fallbackName: string, format: OutputFormat): OutputSettings {
+function readSettings(body: ParsedBody, fallbackName: string, format: OutputFormat): SindySettings {
+  const channelIds = toStrings(body['channelIds']);
+
+  if (format === 'atom') {
+    // Atom feeds: only published posts by default, optional drafts toggle
+    const includeDrafts = toStrings(body['includeDrafts']).length > 0;
+    const statuses: PostStatus[] = ['sent'];
+    if (includeDrafts) statuses.push('draft');
+
+    return {
+      name: toString(body['name']).trim().slice(0, 120) || fallbackName,
+      channelIds,
+      format,
+      eventDurationMinutes: 15,
+      showChannelInTitle: true,
+      maxItems: pickNumber(
+        toString(body['maxItems']),
+        MAX_ITEMS_OPTIONS.map(([v]) => v),
+        50,
+      ),
+      groupCrossPosts: toStrings(body['groupCrossPosts']).length > 0,
+      includeDrafts,
+      refreshMinutes: pickNumber(
+        toString(body['refreshMinutes']),
+        REFRESH_OPTIONS.map(([v]) => v),
+        60,
+      ),
+      // Atom feeds don't use window settings — max_items caps the count
+      windowPastDays: 30,
+      windowFutureDays: 90,
+      statuses,
+    };
+  }
+
+  // ICS calendars: full status picker + window controls
   const statuses = toStrings(body['statuses']).filter(isPostStatus);
 
   return {
     name: toString(body['name']).trim().slice(0, 120) || fallbackName,
-    channelIds: toStrings(body['channelIds']),
+    channelIds,
     format,
     eventDurationMinutes: pickNumber(
       toString(body['eventDurationMinutes']),
@@ -127,12 +162,9 @@ function readSettings(body: ParsedBody, fallbackName: string, format: OutputForm
       15,
     ),
     showChannelInTitle: toStrings(body['showChannelInTitle']).length > 0,
-    maxItems: pickNumber(
-      toString(body['maxItems']),
-      MAX_ITEMS_OPTIONS.map(([v]) => v),
-      50,
-    ),
-    groupCrossPosts: toStrings(body['groupCrossPosts']).length > 0,
+    maxItems: 50,
+    groupCrossPosts: true,
+    includeDrafts: false,
     refreshMinutes: pickNumber(
       toString(body['refreshMinutes']),
       REFRESH_OPTIONS.map(([v]) => v),
@@ -207,7 +239,7 @@ const ChannelPicker: FC<{ channels: BufferChannel[]; selected: Set<string> }> = 
   </div>
 );
 
-const IcsSettingsFields: FC<{ settings: OutputSettings }> = ({ settings }) => (
+const IcsSettingsFields: FC<{ settings: SindySettings }> = ({ settings }) => (
   <>
     <h2>How it looks</h2>
     <div class="row">
@@ -242,7 +274,7 @@ const IcsSettingsFields: FC<{ settings: OutputSettings }> = ({ settings }) => (
   </>
 );
 
-const AtomSettingsFields: FC<{ settings: OutputSettings }> = ({ settings }) => (
+const AtomSettingsFields: FC<{ settings: SindySettings }> = ({ settings }) => (
   <>
     <h2>How it looks</h2>
     <div class="row">
@@ -274,10 +306,23 @@ const AtomSettingsFields: FC<{ settings: OutputSettings }> = ({ settings }) => (
         Group cross-posts <small>— combine identical posts across channels into one entry</small>
       </label>
     </div>
+
+    <div class="checkline">
+      <input
+        type="checkbox"
+        id="includeDrafts"
+        name="includeDrafts"
+        value="1"
+        checked={settings.includeDrafts}
+      />
+      <label for="includeDrafts">
+        Include drafts <small>— also include scheduled drafts that have a date set</small>
+      </label>
+    </div>
   </>
 );
 
-const SharedSettingsFields: FC<{ settings: OutputSettings }> = ({ settings }) => (
+const SharedSettingsFields: FC<{ settings: SindySettings }> = ({ settings }) => (
   <>
     <div class="field">
       <label for="name">{settings.format === 'ics' ? 'Calendar name' : 'Feed name'}</label>
@@ -285,36 +330,42 @@ const SharedSettingsFields: FC<{ settings: OutputSettings }> = ({ settings }) =>
       <small>Shown as the name in your calendar or feed reader app.</small>
     </div>
 
-    <h2>What to include</h2>
-    {STATUS_OPTIONS.map((status) => (
-      <div class="checkline">
-        <input
-          type="checkbox"
-          id={`status-${status.value}`}
-          name="statuses"
-          value={status.value}
-          checked={settings.statuses.includes(status.value)}
-        />
-        <label for={`status-${status.value}`}>
-          {status.label} <small>— {status.hint}</small>
-        </label>
-      </div>
-    ))}
+    {settings.format === 'ics' ? (
+      <>
+        <h2>What to include</h2>
+        {STATUS_OPTIONS.map((status) => (
+          <div class="checkline">
+            <input
+              type="checkbox"
+              id={`status-${status.value}`}
+              name="statuses"
+              value={status.value}
+              checked={settings.statuses.includes(status.value)}
+            />
+            <label for={`status-${status.value}`}>
+              {status.label} <small>— {status.hint}</small>
+            </label>
+          </div>
+        ))}
 
-    <div class="row" style="margin-top:18px">
-      <Select
-        name="windowPastDays"
-        label="How far back"
-        options={PAST_OPTIONS}
-        value={settings.windowPastDays}
-      />
-      <Select
-        name="windowFutureDays"
-        label="How far ahead"
-        options={FUTURE_OPTIONS}
-        value={settings.windowFutureDays}
-      />
-    </div>
+        <div class="row" style="margin-top:18px">
+          <Select
+            name="windowPastDays"
+            label="How far back"
+            options={PAST_OPTIONS}
+            value={settings.windowPastDays}
+          />
+          <Select
+            name="windowFutureDays"
+            label="How far ahead"
+            options={FUTURE_OPTIONS}
+            value={settings.windowFutureDays}
+          />
+        </div>
+      </>
+    ) : (
+      <h2>What to include</h2>
+    )}
   </>
 );
 
@@ -387,21 +438,21 @@ const FORMAT_LABEL: Record<OutputFormat, string> = {
   atom: 'Feed (Atom/RSS)',
 };
 
-outputRoutes.get('/outputs', async (c) => {
+outputRoutes.get('/sindies', async (c) => {
   const user = c.get('user')!;
   const outputs = await listOutputs(c.env.DB, user.id);
 
   return c.html(
-    <Layout title="Your outputs — social sindy" user={user}>
-      <h1>Your outputs</h1>
-      <p class="lede">Each output is one subscribable feed of your Buffer schedule — a calendar or a content feed.</p>
+    <Layout title="Your sindies — social sindy" user={user}>
+      <h1>Your sindies</h1>
+      <p class="lede">Each sindy is one subscribable feed of your Buffer schedule — a calendar or a content feed.</p>
 
       {outputs.length === 0 ? (
         <div class="panel">
           <div class="empty">
-            <p>You have not created an output yet.</p>
-            <a class="btn" href="/outputs/new">
-              Create your first output
+            <p>You have not created a sindy yet.</p>
+            <a class="btn" href="/sindies/new">
+              Create your first sindy
             </a>
           </div>
         </div>
@@ -414,7 +465,7 @@ outputRoutes.get('/outputs', async (c) => {
                 <div class="cal">
                   <div>
                     <h3>
-                      <a href={`/outputs/${output.id}`}>{output.name}</a>
+                      <a href={`/sindies/${output.id}`}>{output.name}</a>
                     </h3>
                     <div class="meta-line">
                       {output.organization_name} · {output.channels.length}{' '}
@@ -425,7 +476,7 @@ outputRoutes.get('/outputs', async (c) => {
                       {state.text}
                     </div>
                   </div>
-                  <a class="btn btn-quiet" href={`/outputs/${output.id}`}>
+                  <a class="btn btn-quiet" href={`/sindies/${output.id}`}>
                     {output.format === 'ics' ? 'Subscribe' : 'View'}
                   </a>
                 </div>
@@ -433,8 +484,8 @@ outputRoutes.get('/outputs', async (c) => {
             );
           })}
           <div class="btn-row">
-            <a class="btn" href="/outputs/new">
-              New output
+            <a class="btn" href="/sindies/new">
+              New sindy
             </a>
           </div>
         </>
@@ -444,12 +495,12 @@ outputRoutes.get('/outputs', async (c) => {
       <div class="panel">
         <p class="small">
           Signed in as {user.email}. Deleting your account removes your stored Buffer credential and
-          every output you created here. It does not touch anything in Buffer.
+          every sindy you created here. It does not touch anything in Buffer.
         </p>
         <form
           method="post"
           action="/account/delete"
-          onsubmit="return confirm('Delete your account, stored credential, and all outputs? Existing feed URLs will stop working.')"
+          onsubmit="return confirm('Delete your account, stored credential, and all sindies? Existing feed URLs will stop working.')"
         >
           <button class="btn-danger" type="submit">
             Delete account and stored credential
@@ -476,8 +527,8 @@ function bufferErrorPage(c: AppContext, error: unknown) {
       <h1>Buffer could not be reached</h1>
       <Notice kind="error">{message}</Notice>
       <div class="btn-row">
-        <a class="btn btn-quiet" href="/outputs">
-          Back to outputs
+        <a class="btn btn-quiet" href="/sindies">
+          Back to sindies
         </a>
         {error instanceof BufferAuthError ? (
           <form method="post" action="/signout">
@@ -490,7 +541,7 @@ function bufferErrorPage(c: AppContext, error: unknown) {
   );
 }
 
-outputRoutes.get('/outputs/new', async (c) => {
+outputRoutes.get('/sindies/new', async (c) => {
   const user = c.get('user')!;
   const organizationId = c.req.query('org');
   const format = (c.req.query('format') === 'atom' ? 'atom' : 'ics') as OutputFormat;
@@ -500,13 +551,13 @@ outputRoutes.get('/outputs/new', async (c) => {
 
     if (!organizationId) {
       if (account.organizations.length === 1) {
-        return c.redirect(`/outputs/new?org=${account.organizations[0]!.id}&format=${format}`, 302);
+        return c.redirect(`/sindies/new?org=${account.organizations[0]!.id}&format=${format}`, 302);
       }
       return c.html(
         <Layout title="Choose an organization — social sindy" user={user} narrow>
           <Steps at={1} />
           <h1>Which Buffer organization?</h1>
-          <p class="lede">Each output covers channels from a single organization.</p>
+          <p class="lede">Each sindy covers channels from a single organization.</p>
           {account.organizations.map((org) => (
             <div class="panel">
               <div class="cal">
@@ -514,7 +565,7 @@ outputRoutes.get('/outputs/new', async (c) => {
                   <h3>{org.name}</h3>
                   <div class="meta-line">{org.ownerEmail}</div>
                 </div>
-                <a class="btn btn-quiet" href={`/outputs/new?org=${org.id}&format=${format}`}>
+                <a class="btn btn-quiet" href={`/sindies/new?org=${org.id}&format=${format}`}>
                   Choose
                 </a>
               </div>
@@ -525,10 +576,10 @@ outputRoutes.get('/outputs/new', async (c) => {
     }
 
     const organization = account.organizations.find((org) => org.id === organizationId);
-    if (!organization) return c.redirect('/outputs/new', 302);
+    if (!organization) return c.redirect('/sindies/new', 302);
 
     const channels = await channelsFor(c.env, user.id, organizationId);
-    const settings: OutputSettings = {
+    const settings: SindySettings = {
       name: `Buffer — ${organization.name}`,
       channelIds: [],
       format,
@@ -536,10 +587,11 @@ outputRoutes.get('/outputs/new', async (c) => {
       showChannelInTitle: true,
       maxItems: 50,
       groupCrossPosts: true,
+      includeDrafts: false,
       refreshMinutes: 60,
       windowPastDays: 30,
       windowFutureDays: 90,
-      statuses: ['scheduled', 'sent'],
+      statuses: format === 'ics' ? ['scheduled', 'sent'] : ['sent'],
     };
 
     return c.html(
@@ -552,18 +604,18 @@ outputRoutes.get('/outputs/new', async (c) => {
             : 'Pick the channels whose posts should appear in the feed.'}
         </p>
 
-        <div class="btn-row" style="margin-bottom:1.5rem">
-          <a class="btn btn-quiet" href={`/outputs/new?org=${organizationId}&format=ics`}
-             style={format === 'ics' ? 'font-weight:700' : ''}>
+        <div class="format-toggle" style="margin-bottom:1.5rem">
+          <a class={`fmt-btn ${format === 'ics' ? 'active' : ''}`}
+             href={`/sindies/new?org=${organizationId}&format=ics`}>
             Calendar (ICS)
           </a>
-          <a class="btn btn-quiet" href={`/outputs/new?org=${organizationId}&format=atom`}
-             style={format === 'atom' ? 'font-weight:700' : ''}>
+          <a class={`fmt-btn ${format === 'atom' ? 'active' : ''}`}
+             href={`/sindies/new?org=${organizationId}&format=atom`}>
             Feed (Atom/RSS)
           </a>
         </div>
 
-        <form method="post" action="/outputs">
+        <form method="post" action="/sindies">
           <input type="hidden" name="organizationId" value={organization.id} />
           <input type="hidden" name="format" value={format} />
           <div class="panel">
@@ -583,7 +635,7 @@ outputRoutes.get('/outputs/new', async (c) => {
             <button type="submit" disabled={channels.length === 0}>
               Create {format === 'ics' ? 'calendar' : 'feed'}
             </button>
-            <a class="btn btn-quiet" href="/outputs">
+            <a class="btn btn-quiet" href="/sindies">
               Cancel
             </a>
           </div>
@@ -595,18 +647,18 @@ outputRoutes.get('/outputs/new', async (c) => {
   }
 });
 
-outputRoutes.post('/outputs', async (c) => {
+outputRoutes.post('/sindies', async (c) => {
   const user = c.get('user')!;
   const body = (await c.req.parseBody({ all: true })) as ParsedBody;
   const organizationId = toString(body['organizationId']);
   const format = (toString(body['format']) === 'atom' ? 'atom' : 'ics') as OutputFormat;
 
-  if (!organizationId) return c.redirect('/outputs/new', 302);
+  if (!organizationId) return c.redirect('/sindies/new', 302);
 
   try {
     const account = await accountFor(c.env, user.id);
     const organization = account.organizations.find((org) => org.id === organizationId);
-    if (!organization) return c.redirect('/outputs/new', 302);
+    if (!organization) return c.redirect('/sindies/new', 302);
 
     const settings = readSettings(body, `Buffer — ${organization.name}`, format);
 
@@ -617,8 +669,8 @@ outputRoutes.post('/outputs', async (c) => {
       return c.html(
         <Layout title="Choose channels — social sindy" user={user}>
           <h1>Pick at least one channel</h1>
-          <Notice kind="error">An output needs at least one channel to show anything.</Notice>
-          <a class="btn" href={`/outputs/new?org=${organizationId}&format=${format}`}>
+          <Notice kind="error">A sindy needs at least one channel to show anything.</Notice>
+          <a class="btn" href={`/sindies/new?org=${organizationId}&format=${format}`}>
             Back
           </a>
         </Layout>,
@@ -647,7 +699,7 @@ outputRoutes.post('/outputs', async (c) => {
       statuses: settings.statuses,
     });
 
-    return c.redirect(`/outputs/${output.id}?created=1`, 302);
+    return c.redirect(`/sindies/${output.id}?created=1`, 302);
   } catch (error) {
     return bufferErrorPage(c, error);
   }
@@ -655,7 +707,7 @@ outputRoutes.post('/outputs', async (c) => {
 
 // -- show -------------------------------------------------------------------
 
-outputRoutes.get('/outputs/:id', async (c) => {
+outputRoutes.get('/sindies/:id', async (c) => {
   const user = c.get('user')!;
   const output = await getOutput(c.env.DB, c.req.param('id'), user.id);
   if (!output) return c.notFound();
@@ -776,7 +828,7 @@ outputRoutes.get('/outputs/:id', async (c) => {
               <h3>On</h3>
               <p class="small">
                 Events are written straight into a Google calendar named "{output.name}", so changes
-                appear within your refresh interval instead of waiting on Google's 8–24 hour polling.
+                appear within your refresh interval instead of waiting on Google's 8-24 hour polling.
                 Only events created by this tool are ever touched.
               </p>
               {pushState ? (
@@ -786,19 +838,19 @@ outputRoutes.get('/outputs/:id', async (c) => {
                 </p>
               ) : null}
               <div class="btn-row">
-                <form method="post" action={`/outputs/${output.id}/push/now`}>
+                <form method="post" action={`/sindies/${output.id}/push/now`}>
                   <button class="btn btn-quiet" type="submit">
                     Sync now
                   </button>
                 </form>
-                <form method="post" action={`/outputs/${output.id}/push/disable`}>
+                <form method="post" action={`/sindies/${output.id}/push/disable`}>
                   <button class="btn btn-quiet" type="submit">
                     Turn off
                   </button>
                 </form>
                 <form
                   method="post"
-                  action={`/outputs/${output.id}/push/remove`}
+                  action={`/sindies/${output.id}/push/remove`}
                   onsubmit="return confirm('Delete the Google calendar this tool created, and all events in it?')"
                 >
                   <button class="btn-danger" type="submit">
@@ -818,7 +870,7 @@ outputRoutes.get('/outputs/:id', async (c) => {
                 It cannot see your existing calendars.
               </p>
               <div class="btn-row">
-                <form method="post" action={`/outputs/${output.id}/push/enable`}>
+                <form method="post" action={`/sindies/${output.id}/push/enable`}>
                   <button type="submit">{googleConnected ? 'Turn on Google sync' : 'Connect Google'}</button>
                 </form>
               </div>
@@ -830,12 +882,12 @@ outputRoutes.get('/outputs/:id', async (c) => {
       <h2>Manage</h2>
       <div class="panel">
         <div class="btn-row">
-          <a class="btn btn-quiet" href={`/outputs/${output.id}/edit`}>
+          <a class="btn btn-quiet" href={`/sindies/${output.id}/edit`}>
             Edit settings
           </a>
           <form
             method="post"
-            action={`/outputs/${output.id}/rotate`}
+            action={`/sindies/${output.id}/rotate`}
             onsubmit="return confirm('Replace the URL? You will need to re-subscribe in every app.')"
           >
             <button class="btn btn-quiet" type="submit">
@@ -844,11 +896,11 @@ outputRoutes.get('/outputs/:id', async (c) => {
           </form>
           <form
             method="post"
-            action={`/outputs/${output.id}/delete`}
-            onsubmit="return confirm('Delete this output? The feed URL will stop working.')"
+            action={`/sindies/${output.id}/delete`}
+            onsubmit="return confirm('Delete this sindy? The feed URL will stop working.')"
           >
             <button class="btn-danger" type="submit">
-              Delete output
+              Delete sindy
             </button>
           </form>
         </div>
@@ -859,14 +911,14 @@ outputRoutes.get('/outputs/:id', async (c) => {
 
 // -- edit -------------------------------------------------------------------
 
-outputRoutes.get('/outputs/:id/edit', async (c) => {
+outputRoutes.get('/sindies/:id/edit', async (c) => {
   const user = c.get('user')!;
   const output = await getOutput(c.env.DB, c.req.param('id'), user.id);
   if (!output) return c.notFound();
 
   try {
     const channels = await channelsFor(c.env, user.id, output.organization_id);
-    const settings: OutputSettings = {
+    const settings: SindySettings = {
       name: output.name,
       channelIds: output.channels.map((ch) => ch.channel_id),
       format: output.format,
@@ -874,6 +926,7 @@ outputRoutes.get('/outputs/:id/edit', async (c) => {
       showChannelInTitle: output.show_channel_in_title === 1,
       maxItems: output.max_items,
       groupCrossPosts: output.group_cross_posts === 1,
+      includeDrafts: output.statuses.split(',').includes('draft'),
       refreshMinutes: output.refresh_minutes,
       windowPastDays: output.window_past_days,
       windowFutureDays: output.window_future_days,
@@ -885,7 +938,7 @@ outputRoutes.get('/outputs/:id/edit', async (c) => {
         <h1>Edit {output.format === 'ics' ? 'calendar' : 'feed'}</h1>
         <p class="lede">{output.organization_name} · {FORMAT_LABEL[output.format]}</p>
 
-        <form method="post" action={`/outputs/${output.id}`}>
+        <form method="post" action={`/sindies/${output.id}`}>
           <input type="hidden" name="format" value={output.format} />
           <div class="panel">
             <ChannelPicker channels={channels} selected={new Set(settings.channelIds)} />
@@ -896,7 +949,7 @@ outputRoutes.get('/outputs/:id/edit', async (c) => {
           </div>
           <div class="btn-row">
             <button type="submit">Save changes</button>
-            <a class="btn btn-quiet" href={`/outputs/${output.id}`}>
+            <a class="btn btn-quiet" href={`/sindies/${output.id}`}>
               Cancel
             </a>
           </div>
@@ -908,7 +961,7 @@ outputRoutes.get('/outputs/:id/edit', async (c) => {
   }
 });
 
-outputRoutes.post('/outputs/:id', async (c) => {
+outputRoutes.post('/sindies/:id', async (c) => {
   const user = c.get('user')!;
   const output = await getOutput(c.env.DB, c.req.param('id'), user.id);
   if (!output) return c.notFound();
@@ -921,7 +974,7 @@ outputRoutes.post('/outputs/:id', async (c) => {
     const chosen = available.filter((channel) => settings.channelIds.includes(channel.id));
 
     if (!chosen.length) {
-      return c.redirect(`/outputs/${output.id}/edit`, 302);
+      return c.redirect(`/sindies/${output.id}/edit`, 302);
     }
 
     await updateOutput(c.env.DB, output.id, {
@@ -941,26 +994,26 @@ outputRoutes.post('/outputs/:id', async (c) => {
       statuses: settings.statuses,
     });
 
-    return c.redirect(`/outputs/${output.id}`, 302);
+    return c.redirect(`/sindies/${output.id}`, 302);
   } catch (error) {
     return bufferErrorPage(c, error);
   }
 });
 
-outputRoutes.post('/outputs/:id/rotate', async (c) => {
+outputRoutes.post('/sindies/:id/rotate', async (c) => {
   const user = c.get('user')!;
   const output = await getOutput(c.env.DB, c.req.param('id'), user.id);
   if (!output) return c.notFound();
 
   await rotateFeedToken(c.env.DB, output.id);
-  return c.redirect(`/outputs/${output.id}`, 302);
+  return c.redirect(`/sindies/${output.id}`, 302);
 });
 
-outputRoutes.post('/outputs/:id/delete', async (c) => {
+outputRoutes.post('/sindies/:id/delete', async (c) => {
   const user = c.get('user')!;
   const output = await getOutput(c.env.DB, c.req.param('id'), user.id);
   if (!output) return c.notFound();
 
   await deleteOutput(c.env.DB, output.id);
-  return c.redirect('/outputs', 302);
+  return c.redirect('/sindies', 302);
 });

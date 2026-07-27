@@ -38,7 +38,7 @@ export const googleRoutes = new Hono<AppBindings>();
 // Scoped rather than '*' — see the note in outputs.tsx. This router serves
 // two path families, so both are guarded explicitly.
 googleRoutes.use('/google/*', requireUser);
-googleRoutes.use('/outputs/:id/push/*', requireUser);
+googleRoutes.use('/sindies/:id/push/*', requireUser);
 
 /** OAuth state and PKCE verifier, held server-side for the round trip only. */
 const STATE_TTL_SECONDS = 600;
@@ -52,7 +52,7 @@ function notConfigured(c: AppContext) {
         Calendar. The calendar feed still works — subscribe to it instead.
       </Notice>
       <p>
-        <a href="/outputs">Back to your outputs</a>
+        <a href="/sindies">Back to your sindies</a>
       </p>
     </Layout>,
     501,
@@ -72,8 +72,8 @@ function pushError(c: AppContext, error: unknown) {
       <Notice kind="error">{message}</Notice>
       <div class="btn-row">
         {reconnect ? <a class="btn" href="/google/connect">Reconnect Google</a> : null}
-        <a class="btn btn-quiet" href="/outputs">
-          Back to your outputs
+        <a class="btn btn-quiet" href="/sindies">
+          Back to your sindies
         </a>
       </div>
     </Layout>,
@@ -115,13 +115,13 @@ googleRoutes.get('/google/callback', async (c) => {
         <h1>Google was not connected</h1>
         <Notice>You declined the permission request, so nothing changed.</Notice>
         <p>
-          <a href="/outputs">Back to your outputs</a>
+          <a href="/sindies">Back to your sindies</a>
         </p>
       </Layout>,
     );
   }
 
-  if (!state || !code) return c.redirect('/outputs', 302);
+  if (!state || !code) return c.redirect('/sindies', 302);
 
   const stored = (await c.env.FEED_CACHE.get(`gstate:${state}`, 'json')) as
     | { userId: string; verifier: string }
@@ -163,7 +163,7 @@ googleRoutes.get('/google/callback', async (c) => {
     const sealed = await sealSecret(tokens.refreshToken, c.env.ENCRYPTION_KEY);
     await saveGoogleCredential(c.env.DB, user.id, sealed, { email, scope: tokens.scope });
 
-    return c.redirect('/outputs?google=connected', 302);
+    return c.redirect('/sindies?google=connected', 302);
   } catch (error) {
     return pushError(c, error);
   }
@@ -173,12 +173,12 @@ googleRoutes.post('/google/disconnect', async (c) => {
   const user = c.get('user')!;
   await deleteGoogleCredential(c.env.DB, user.id);
   await c.env.FEED_CACHE.delete(`gtoken:${user.id}`);
-  return c.redirect('/outputs', 302);
+  return c.redirect('/sindies', 302);
 });
 
 // -- per-output push (ICS only) ---------------------------------------------
 
-googleRoutes.post('/outputs/:id/push/enable', async (c) => {
+googleRoutes.post('/sindies/:id/push/enable', async (c) => {
   const config = googleConfig(c.env);
   if (!config) return notConfigured(c);
 
@@ -204,20 +204,20 @@ googleRoutes.post('/outputs/:id/push/enable', async (c) => {
     return pushError(c, error);
   }
 
-  return c.redirect(`/outputs/${output.id}?push=on`, 302);
+  return c.redirect(`/sindies/${output.id}?push=on`, 302);
 });
 
-googleRoutes.post('/outputs/:id/push/disable', async (c) => {
+googleRoutes.post('/sindies/:id/push/disable', async (c) => {
   const user = c.get('user')!;
   const output = await getOutput(c.env.DB, c.req.param('id'), user.id);
   if (!output) return c.notFound();
 
   await setPushEnabled(c.env.DB, output.id, false);
 
-  return c.redirect(`/outputs/${output.id}?push=off`, 302);
+  return c.redirect(`/sindies/${output.id}?push=off`, 302);
 });
 
-googleRoutes.post('/outputs/:id/push/now', async (c) => {
+googleRoutes.post('/sindies/:id/push/now', async (c) => {
   const config = googleConfig(c.env);
   if (!config) return notConfigured(c);
 
@@ -231,11 +231,11 @@ googleRoutes.post('/outputs/:id/push/now', async (c) => {
     return pushError(c, error);
   }
 
-  return c.redirect(`/outputs/${output.id}?push=synced`, 302);
+  return c.redirect(`/sindies/${output.id}?push=synced`, 302);
 });
 
 /** Removes the Google calendar this tool created, on explicit request. */
-googleRoutes.post('/outputs/:id/push/remove', async (c) => {
+googleRoutes.post('/sindies/:id/push/remove', async (c) => {
   const config = googleConfig(c.env);
   if (!config) return notConfigured(c);
 
@@ -256,5 +256,5 @@ googleRoutes.post('/outputs/:id/push/remove', async (c) => {
     return pushError(c, error);
   }
 
-  return c.redirect(`/outputs/${output.id}?push=removed`, 302);
+  return c.redirect(`/sindies/${output.id}?push=removed`, 302);
 });

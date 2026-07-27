@@ -220,7 +220,7 @@ describe('/auth/callback — a repeat sign-in with no refresh token', () => {
     const response = await callback(`state=${state}&code=code-1`, envWith(db, kv));
 
     expect(response.status).toBe(302);
-    expect(response.headers.get('location')).toBe('/outputs');
+    expect(response.headers.get('location')).toBe('/sindies');
     expect(db.sessions).toHaveLength(1);
     expect(db.sessions[0]!.userId).toBe('usr-1');
   });
@@ -282,7 +282,7 @@ describe('/auth/callback — a first sign-in', () => {
 
     const response = await callback(`state=${state}&code=code-1`, envWith(db, kv));
 
-    expect(response.headers.get('location')).toBe('/outputs');
+    expect(response.headers.get('location')).toBe('/sindies');
     const stored = db.oauth.get('usr-1')!;
     expect(await openSecret({ ciphertext: stored.ciphertext, iv: stored.iv }, KEY)).toBe('rt-new');
     // A full-access key must not linger once a read-only grant exists.

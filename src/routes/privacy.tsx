@@ -61,8 +61,8 @@ privacyRoutes.get('/privacy', (c) =>
           written to logs, never shown back to you, and never sent anywhere except Buffer's own API.
         </li>
         <li>
-          <strong>Your output settings</strong> — which organization and channels you chose, the
-          output format (ICS or Atom), event length, refresh interval, date window, and which post
+          <strong>Your sindy settings</strong> — which organization and channels you chose, the
+          format (ICS or Atom), event length, refresh interval, date window, and which post
           statuses to include.
         </li>
         <li>

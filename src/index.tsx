@@ -5,7 +5,7 @@
  *
  * Route groups:
  *   /                   connect Buffer (also signs in)
- *   /outputs/*          create and manage outputs (ICS or Atom)
+ *   /sindies/*          create and manage sindies (ICS or Atom)
  *   /google/*           connect Google and drive the optional push (ICS only)
  *   /privacy            privacy policy
  *   /feed/:token.ics    the public ICS feed calendar clients poll
@@ -116,7 +116,7 @@ app.onError((error, c) => {
             : error.message || 'That request could not be completed.'}
         </Notice>
         <p>
-          <a href="/outputs">Back to your outputs</a>
+          <a href="/sindies">Back to your sindies</a>
         </p>
       </Layout>,
       error.status,
@@ -135,7 +135,7 @@ app.onError((error, c) => {
         Buffer key.
       </Notice>
       <p>
-        <a href="/outputs">Back to your outputs</a>
+        <a href="/sindies">Back to your sindies</a>
       </p>
     </Layout>,
     500,

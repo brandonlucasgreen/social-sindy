@@ -225,7 +225,7 @@ function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
 }
 
 authRoutes.get('/', (c) => {
-  if (c.get('user')) return c.redirect('/outputs', 302);
+  if (c.get('user')) return c.redirect('/sindies', 302);
   return c.html(<ConnectPage oauth={bufferOAuthConfig(c.env) !== null} />);
 });
 
@@ -402,7 +402,7 @@ authRoutes.get('/auth/callback', async (c) => {
   );
 
   await startSession(c, user.id);
-  return c.redirect('/outputs', 302);
+  return c.redirect('/sindies', 302);
 });
 
 authRoutes.post('/connect', async (c) => {
@@ -453,7 +453,7 @@ authRoutes.post('/connect', async (c) => {
   );
 
   await startSession(c, user.id);
-  return c.redirect('/outputs', 302);
+  return c.redirect('/sindies', 302);
 });
 
 authRoutes.post('/signout', async (c) => {
