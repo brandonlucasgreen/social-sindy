@@ -538,7 +538,6 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
         {children}
         <footer class="site">
           <p>
-            <a href="/faq">FAQ</a> &middot;{' '}
             Made with love in Massachusetts, USA. An independent tool, not made by or affiliated
             with Buffer. It never posts on your behalf.
           </p>
@@ -554,6 +553,8 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
             >
               Donate
             </a>{' '}
+            &middot;{' '}
+            <a href="/faq">FAQ</a>{' '}
             &middot;{' '}
             <a href="/privacy" target="_blank" rel="noopener noreferrer">
               Privacy policy
