@@ -162,7 +162,7 @@ export class GoogleCalendarClient {
   /** Creates the dedicated secondary calendar and returns its ID. */
   async createCalendar(summary: string, timeZone: string): Promise<string> {
     const created = await this.request<{ id: string }>('POST', '/calendars', {
-      body: { summary, description: 'Managed by social cally. Edits here will be overwritten.', timeZone },
+      body: { summary, description: 'Managed by social sindy. Edits here will be overwritten.', timeZone },
     });
 
     if (!created?.id) throw new GoogleApiError('Google did not return a calendar ID', 0);

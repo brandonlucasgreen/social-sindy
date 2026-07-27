@@ -1,23 +1,24 @@
 /**
- * The public iCalendar feed.
+ * The public feed endpoint — handles both ICS and Atom outputs.
  *
- * Unauthenticated by necessity: Google, Apple, and Outlook fetch subscribed
- * feeds without the ability to send a credential, so the feed token in the URL
- * is the only secret. Two consequences shape this module:
+ * Unauthenticated by necessity: Google, Apple, Outlook, and RSS readers fetch
+ * subscribed feeds without the ability to send a credential, so the feed token
+ * in the URL is the only secret. Two consequences shape this module:
  *
  *  1. Anyone holding the URL can read the feed, so tokens are 32 random bytes
  *     and can be rotated.
  *  2. The endpoint is a public trigger for a Buffer API call, and Buffer's
- *     quota is small. Every response is served from KV within the calendar's
+ *     quota is small. Every response is served from KV within the output's
  *     refresh interval, so no volume of polling can drain a user's quota: at
  *     most one Buffer fetch per interval, however often the URL is hit.
  */
 
 import { BufferRateLimitError } from './buffer/client.js';
-import { recordPoll, type CalendarWithChannels } from './db.js';
+import { recordPoll, type OutputWithChannels } from './db.js';
 import type { Env } from './env.js';
 import { generateIcs, type ChannelRef } from './ics/generate.js';
-import { postsForCalendar } from './sync/posts.js';
+import { generateAtom } from './atom/generate.js';
+import { postsForOutput } from './sync/posts.js';
 
 /** How long a successful render is kept as the fallback for a failed refresh. */
 const LAST_GOOD_TTL_SECONDS = 7 * 86_400;
@@ -34,19 +35,19 @@ export interface FeedResult {
   eventCount: number | null;
 }
 
-function freshKey(calendar: CalendarWithChannels): string {
+function freshKey(output: OutputWithChannels): string {
   // The updated_at stamp is part of the key so a settings change invalidates
   // the cached render immediately rather than waiting out the TTL.
-  return `feed:fresh:${calendar.id}:${calendar.updated_at}`;
+  return `feed:fresh:${output.id}:${output.updated_at}`;
 }
 
-function lastGoodKey(calendar: CalendarWithChannels): string {
-  return `feed:last-good:${calendar.id}`;
+function lastGoodKey(output: OutputWithChannels): string {
+  return `feed:last-good:${output.id}`;
 }
 
-function channelRefs(calendar: CalendarWithChannels): Map<string, ChannelRef> {
+function channelRefs(output: OutputWithChannels): Map<string, ChannelRef> {
   return new Map(
-    calendar.channels.map((row) => [
+    output.channels.map((row) => [
       row.channel_id,
       { id: row.channel_id, name: row.channel_name, service: row.service },
     ]),
@@ -56,10 +57,10 @@ function channelRefs(calendar: CalendarWithChannels): Map<string, ChannelRef> {
 /** Renders the feed, preferring cache and falling back to the last good copy. */
 export function buildFeed(
   env: Env,
-  calendar: CalendarWithChannels,
+  output: OutputWithChannels,
   now: Date = new Date(),
 ): Promise<FeedResult> {
-  return cachedFeed(env, calendar, () => renderFromBuffer(env, calendar, now));
+  return cachedFeed(env, output, () => renderFromBuffer(env, output, now));
 }
 
 /**
@@ -68,39 +69,44 @@ export function buildFeed(
  *
  * Two properties matter enough to be tested directly: a cache hit must never
  * reach Buffer (that is what protects the quota from unbounded polling), and a
- * Buffer failure must never surface as an empty calendar, which clients would
+ * Buffer failure must never surface as an empty feed, which clients would
  * interpret as every event having been deleted.
  */
 export async function cachedFeed(
   env: Env,
-  calendar: CalendarWithChannels,
+  output: OutputWithChannels,
   render: () => Promise<string>,
 ): Promise<FeedResult> {
-  const cached = await env.FEED_CACHE.get(freshKey(calendar));
+  const cached = await env.FEED_CACHE.get(freshKey(output));
   if (cached) return { body: cached, cached: true, stale: false, eventCount: null };
 
   try {
     const body = await render();
-    const ttl = Math.max(MIN_KV_TTL_SECONDS, calendar.refresh_minutes * 60);
+    const ttl = Math.max(MIN_KV_TTL_SECONDS, output.refresh_minutes * 60);
 
     await Promise.all([
-      env.FEED_CACHE.put(freshKey(calendar), body, { expirationTtl: ttl }),
-      env.FEED_CACHE.put(lastGoodKey(calendar), body, { expirationTtl: LAST_GOOD_TTL_SECONDS }),
+      env.FEED_CACHE.put(freshKey(output), body, { expirationTtl: ttl }),
+      env.FEED_CACHE.put(lastGoodKey(output), body, { expirationTtl: LAST_GOOD_TTL_SECONDS }),
     ]);
 
-    const eventCount = (body.match(/BEGIN:VEVENT/g) ?? []).length;
+    // Count events/items depending on format
+    const eventCount =
+      output.format === 'ics'
+        ? (body.match(/BEGIN:VEVENT/g) ?? []).length
+        : (body.match(/<entry>/g) ?? []).length;
+
     return { body, cached: false, stale: false, eventCount };
   } catch (error) {
-    // A transient Buffer failure must not make a subscribed calendar go empty,
-    // which clients would render as every event being deleted.
-    const lastGood = await env.FEED_CACHE.get(lastGoodKey(calendar));
+    // A transient Buffer failure must not make a subscribed feed go empty,
+    // which clients would render as every event having been deleted.
+    const lastGood = await env.FEED_CACHE.get(lastGoodKey(output));
     if (lastGood) {
       // Back off before retrying, so a rate-limited account is not hammered.
       const backoff =
         error instanceof BufferRateLimitError && error.retryAfterSeconds
           ? Math.max(MIN_KV_TTL_SECONDS, error.retryAfterSeconds)
           : MIN_KV_TTL_SECONDS * 5;
-      await env.FEED_CACHE.put(freshKey(calendar), lastGood, { expirationTtl: backoff });
+      await env.FEED_CACHE.put(freshKey(output), lastGood, { expirationTtl: backoff });
 
       return { body: lastGood, cached: true, stale: true, eventCount: null };
     }
@@ -108,34 +114,54 @@ export async function cachedFeed(
   }
 }
 
-async function renderFromBuffer(
+async function renderIcs(
   env: Env,
-  calendar: CalendarWithChannels,
+  output: OutputWithChannels,
   now: Date,
 ): Promise<string> {
-  // Read through the shared post cache, so a Google push in the same interval
-  // reuses this fetch rather than spending another Buffer request.
-  const { bundle } = await postsForCalendar(env, calendar, now);
+  const { bundle } = await postsForOutput(env, output, now);
   const { posts, truncated } = bundle;
 
   const description = truncated
-    ? `${calendar.organization_name} — showing the first pages of a large queue`
-    : calendar.organization_name;
+    ? `${output.organization_name} — showing the first pages of a large queue`
+    : output.organization_name;
 
   return generateIcs(
     posts,
-    channelRefs(calendar),
+    channelRefs(output),
     {
-      calendarId: calendar.id,
-      name: calendar.name,
+      calendarId: output.id,
+      name: output.name,
       description,
       timezone: 'UTC',
-      eventDurationMinutes: calendar.event_duration_minutes,
-      refreshMinutes: calendar.refresh_minutes,
-      showChannelInTitle: calendar.show_channel_in_title === 1,
+      eventDurationMinutes: output.event_duration_minutes,
+      refreshMinutes: output.refresh_minutes,
+      showChannelInTitle: output.show_channel_in_title === 1,
     },
     now,
   );
+}
+
+async function renderAtom(
+  env: Env,
+  output: OutputWithChannels,
+  now: Date,
+): Promise<string> {
+  const { bundle } = await postsForOutput(env, output, now);
+  const { posts, truncated } = bundle;
+
+  const description = truncated
+    ? `${output.organization_name} — showing the most recent posts from a large history`
+    : output.organization_name;
+
+  return generateAtom(posts, channelRefs(output), {
+    feedId: output.id,
+    name: output.name,
+    subtitle: description,
+    appUrl: env.APP_BASE_URL,
+    feedToken: output.feed_token,
+    groupCrossPosts: output.group_cross_posts === 1,
+  }, now);
 }
 
 /** Weak validator over the rendered body, so unchanged feeds can 304. */
@@ -155,18 +181,18 @@ export interface FeedResponseOptions {
 
 export async function respondWithFeed(
   env: Env,
-  calendar: CalendarWithChannels,
+  output: OutputWithChannels,
   request: Request,
   options: FeedResponseOptions = {},
 ): Promise<Response> {
   let result: FeedResult;
   try {
-    result = await buildFeed(env, calendar);
+    result = await buildFeed(env, output);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    options.waitUntil?.(recordPoll(env.DB, calendar.id, { fetched: true, error: message }));
+    options.waitUntil?.(recordPoll(env.DB, output.id, { fetched: true, error: message }));
 
-    // 401 would tell a calendar client to prompt for credentials it cannot
+    // 401 would tell a client to prompt for credentials it cannot
     // supply; 503 with Retry-After is the signal to try again later.
     const retryAfter = error instanceof BufferRateLimitError ? error.retryAfterSeconds : null;
     return new Response(`Could not build this feed: ${message}\n`, {
@@ -179,23 +205,28 @@ export async function respondWithFeed(
   }
 
   options.waitUntil?.(
-    recordPoll(env.DB, calendar.id, {
+    recordPoll(env.DB, output.id, {
       fetched: !result.cached,
       eventCount: result.eventCount ?? undefined,
       error: null,
     }),
   );
 
+  const isIcs = output.format === 'ics';
   const etag = await etagFor(result.body);
   const headers: Record<string, string> = {
-    'Content-Type': 'text/calendar; charset=utf-8',
-    'Content-Disposition': `inline; filename="${calendar.id}.ics"`,
-    'Cache-Control': `public, max-age=${Math.max(60, calendar.refresh_minutes * 60)}`,
+    'Content-Type': isIcs ? 'text/calendar; charset=utf-8' : 'application/atom+xml; charset=utf-8',
+    'Cache-Control': `public, max-age=${Math.max(60, output.refresh_minutes * 60)}`,
     ETag: etag,
     // The feed is a private URL; keep it out of search engines and referrers.
     'X-Robots-Tag': 'noindex, nofollow',
     'Referrer-Policy': 'no-referrer',
   };
+
+  if (isIcs) {
+    headers['Content-Disposition'] = `inline; filename="${output.id}.ics"`;
+  }
+
   if (result.stale) headers['X-Feed-Stale'] = 'true';
 
   if (request.headers.get('If-None-Match') === etag) {

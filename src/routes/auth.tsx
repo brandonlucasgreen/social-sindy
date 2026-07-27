@@ -144,11 +144,12 @@ const ApiKeyWarning = () => (
 
 function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
   return (
-    <Layout title="social cally — your Buffer queue in your calendar">
-      <h1>Your content schedule, in the calendar you actually check.</h1>
+    <Layout title="social sindy — your Buffer queue as feeds">
+      <h1>Your content schedule, as feeds you actually subscribe to.</h1>
       <p class="lede">
-        Connect Buffer, choose your channels, and get a calendar you can subscribe to in Google
-        Calendar, Apple Calendar, or Outlook.
+        Connect Buffer, choose your channels, and get a calendar feed (ICS) for Google Calendar,
+        Apple Calendar, or Outlook — plus a content feed (Atom/RSS) for your blog or RSS reader.
+        One connection, both formats.
       </p>
 
       <HeroDemo />
@@ -224,7 +225,7 @@ function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
 }
 
 authRoutes.get('/', (c) => {
-  if (c.get('user')) return c.redirect('/calendars', 302);
+  if (c.get('user')) return c.redirect('/outputs', 302);
   return c.html(<ConnectPage oauth={bufferOAuthConfig(c.env) !== null} />);
 });
 
@@ -401,7 +402,7 @@ authRoutes.get('/auth/callback', async (c) => {
   );
 
   await startSession(c, user.id);
-  return c.redirect('/calendars', 302);
+  return c.redirect('/outputs', 302);
 });
 
 authRoutes.post('/connect', async (c) => {
@@ -452,7 +453,7 @@ authRoutes.post('/connect', async (c) => {
   );
 
   await startSession(c, user.id);
-  return c.redirect('/calendars', 302);
+  return c.redirect('/outputs', 302);
 });
 
 authRoutes.post('/signout', async (c) => {

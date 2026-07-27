@@ -1,26 +1,20 @@
 /**
- * THESIS: This surface owns "your Buffer queue, in the calendar you already
- * check." It refuses the category default — a centered white card holding a
- * lone API-key field on a gray gradient — and leads with the artifact itself.
+ * THESIS: This surface owns "your posts, everywhere, in feeds you subscribe to."
+ * It leads with the artifact itself — a sample week of posts as network-tinted
+ * chips — and connects Buffer to get a real one. One connection produces both
+ * calendar (ICS) and content (Atom/RSS) feeds.
  *
- * OWN-WORLD: Brand-adjacent but not Buffer-liveried, and deliberately drifting
- * further as the tool establishes itself as third-party. Cool slate ground (or
- * navy inverse), navy text never black, a steel-blue primary carrying dark
- * text, full-pill controls, 10/20/40px radii, and a card shadow whose third
- * layer is a solid un-blurred 8px offset — a sticker edge that presses in when
- * clicked. Buffer's structural cues (pill geometry, offset depth, the fluid
- * scales) survive; its cream-and-mint colouring and its typeface do not.
+ * OWN-WORLD: Warm cream ground with amber accent, sharing Buffer's structural
+ * language (pill geometry, offset depth, SN Pro) in a warm colour family. The
+ * broadcast-signal icon says "syndication" where cally's calendar pegs said
+ * "schedule."
  *
- * STORY: A cold visitor sees their own posting week rendered as calendar
- * events, understands this is read-only, and connects Buffer.
+ * STORY: A cold visitor sees their own posting week rendered as feed items,
+ * understands this is read-only, and connects Buffer.
  *
- * FIRST VIEWPORT: Large regular-weight headline at -0.02em; beneath it a live
- * week strip of network-coloured post chips demonstrating the output; then a
- * pill input paired with a steel-blue pill button; then what it can and cannot see.
- *
- * FORM: Brief-pinned world (Buffer marketing language), so no concept roll.
- * Rendered from the palette's full range — pill geometry, offset depth, real
- * network colour on the sample chips — not its softest reading.
+ * FIRST VIEWPORT: Large regular-weight headline; beneath it a live week strip
+ * of network-coloured post chips; then a pill button to connect Buffer; then
+ * what it can and cannot see.
  */
 
 import type { FC, PropsWithChildren } from 'hono/jsx';
@@ -31,17 +25,17 @@ const STYLES = `
 :root {
   color-scheme: light dark;
 
-  --ground: hsl(215 32% 98%);
+  --ground: hsl(40 33% 97%);
   --raised: hsl(0 0% 100%);
-  --sunken: hsl(215 26% 95%);
-  --text: hsl(217 33% 17%);
-  --text-dim: hsl(215 14% 45%);
-  --border: hsl(215 16% 79%);
-  --border-soft: hsl(215 20% 89%);
-  --accent: hsl(214 70% 80%);
-  --accent-deep: hsl(214 58% 71%);
-  --link: hsl(217 61% 38%);
-  --edge: hsl(217 30% 22%);
+  --sunken: hsl(40 26% 94%);
+  --text: hsl(30 10% 16%);
+  --text-dim: hsl(30 8% 44%);
+  --border: hsl(30 12% 80%);
+  --border-soft: hsl(30 16% 88%);
+  --accent: hsl(35 85% 68%);
+  --accent-deep: hsl(35 75% 55%);
+  --link: hsl(25 80% 38%);
+  --edge: hsl(30 20% 18%);
 
   --warn-bg: hsl(40 100% 88%);
   --warn-edge: hsl(40 70% 41%);
@@ -56,28 +50,28 @@ const STYLES = `
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --dur: 150ms;
 
-  /* Buffer's own card shadow: two soft ambient layers over a solid offset that
-     reads as a physical edge. The third layer is the signature. */
   --shadow-card:
-    0 -0.25rem 1.5rem -0.5rem hsl(217 33% 9% / 0.10),
-    0 0.25rem 0.5rem -0.25rem hsl(217 33% 9% / 0.10),
+    0 -0.25rem 1.5rem -0.5rem hsl(30 15% 9% / 0.10),
+    0 0.25rem 0.5rem -0.25rem hsl(30 15% 9% / 0.10),
     0 0.5rem 0 0 var(--edge);
   --shadow-raised:
-    0 0.25rem 0.75rem -0.125rem hsl(217 33% 9% / 0.10),
-    0 0 0.0625rem 0.0625rem hsl(217 33% 9% / 0.05);
+    0 0.25rem 0.75rem -0.125rem hsl(30 15% 9% / 0.10),
+    0 0 0.0625rem 0.0625rem hsl(30 15% 9% / 0.05);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ground: hsl(217 33% 14%);
-    --raised: hsl(217 27% 18%);
-    --sunken: hsl(217 33% 11%);
-    --text: hsl(215 32% 97%);
-    --text-dim: hsl(215 16% 72%);
-    --border: hsl(215 14% 31%);
-    --border-soft: hsl(215 16% 25%);
-    --link: hsl(214 70% 80%);
-    --edge: hsl(217 40% 8%);
+    --ground: hsl(30 10% 14%);
+    --raised: hsl(30 8% 18%);
+    --sunken: hsl(30 12% 11%);
+    --text: hsl(40 30% 96%);
+    --text-dim: hsl(30 10% 70%);
+    --border: hsl(30 8% 30%);
+    --border-soft: hsl(30 6% 24%);
+    --accent: hsl(35 85% 68%);
+    --accent-deep: hsl(35 80% 58%);
+    --link: hsl(35 85% 68%);
+    --edge: hsl(30 15% 8%);
 
     --warn-bg: hsl(40 25% 18%);
     --warn-edge: hsl(40 45% 40%);
@@ -197,9 +191,8 @@ button, .btn {
   font: inherit; font-size: 0.9375rem; font-weight: 600; letter-spacing: 0.0075em;
   padding: 0.6875rem 1.375rem;
   border: 1px solid transparent; border-radius: var(--pill);
-  /* Mint with DARK text — the palette's most recognizable and most easily lost
-     detail. White on saturated colour would read as generic SaaS. */
-  background: var(--accent); color: hsl(217 33% 17%);
+  /* Amber with DARK text — the warm palette's signature. */
+  background: var(--accent); color: hsl(30 10% 16%);
   cursor: pointer; text-decoration: none; white-space: nowrap;
   transition: transform var(--dur) var(--ease), background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
@@ -256,7 +249,7 @@ button[disabled], .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform
   background: var(--border-soft); color: var(--text); font-size: 0.6875rem; font-weight: 600;
 }
 .step.on { color: var(--text); background: var(--accent); }
-.step.on i { background: hsl(217 33% 17%); color: var(--accent); }
+.step.on i { background: hsl(30 10% 16%); color: var(--accent); }
 .step.done i { background: var(--link); color: var(--ground); }
 
 /* --- channels ----------------------------------------------------------- */
@@ -473,16 +466,14 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
     <body>
       <div class={narrow ? 'wrap narrow' : 'wrap'}>
         <header class="masthead">
-          {/* The product is called "social cally" wherever a person reads it —
+          {/* The product is called "social sindy" wherever a person reads it —
               this wordmark, page titles, the privacy policy. The hyphenated
-              `social-cally` is kept everywhere it is load-bearing: the package,
-              Worker, D1 database, repo, and above all the ICS UID domain in
-              src/ics/generate.ts, where a change would make every subscribed
-              client delete and recreate every event. Renaming for consistency
-              is an obvious-looking cleanup with an expensive failure mode. */}
+              `social-sindy` is kept everywhere it is load-bearing: the package,
+              Worker, D1 database, repo, and the ICS UID domain in
+              src/ics/generate.ts. */}
           <a class="brand" href="/">
             <Mark />
-            social cally
+            social sindy
           </a>
           {user ? (
             <span class="who">
