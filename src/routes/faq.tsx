@@ -49,9 +49,7 @@ faqRoutes.get('/faq', (c) => {
       <h1>Frequently asked questions</h1>
       {FAQ.map((item, index) => (
         <div class="faq-item">
-          <h2 id={`q${index + 1}`}>
-            <a href={`#q${index + 1}`}>{item.q}</a>
-          </h2>
+          <h2>{item.q}</h2>
           <div dangerouslySetInnerHTML={{ __html: item.a }} />
         </div>
       ))}
