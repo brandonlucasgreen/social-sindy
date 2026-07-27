@@ -22,32 +22,33 @@ const LAST_UPDATED = '26 July 2026';
 
 privacyRoutes.get('/privacy', (c) =>
   c.html(
-    <Layout title="Privacy policy — social cally" user={c.get('user')} narrow>
+    <Layout title="Privacy policy — social sindy" user={c.get('user')} narrow>
       <h1>Privacy policy</h1>
       <p class="lede">
-        What social cally stores, why, for how long, and who else sees it. Last updated{' '}
+        What social sindy stores, why, for how long, and who else sees it. Last updated{' '}
         {LAST_UPDATED}.
       </p>
 
       <Notice>
         <p>
           <strong>The short version.</strong> This tool reads your Buffer posting schedule and turns
-          it into a calendar. It stores your Buffer credential encrypted, caches your posts briefly
-          so it does not exhaust your Buffer API quota, and never publishes anything, sells anything,
-          or runs analytics or advertising. Deleting your account erases everything it holds.
+          it into subscribable feeds — calendar feeds (ICS) and content feeds (Atom/RSS). It stores your
+          Buffer credential encrypted, caches your posts briefly so it does not exhaust your Buffer API
+          quota, and never publishes anything, sells anything, or runs analytics or advertising. Deleting
+          your account erases everything it holds.
         </p>
       </Notice>
 
       <h2>Who runs this</h2>
       <p>
-        social cally is an independent tool. It is not made by, affiliated with, or endorsed by
+        social sindy is an independent tool. It is not made by, affiliated with, or endorsed by
         Buffer or Google. This deployment is operated by <strong>Brandon Lucas Green</strong>, who
         is responsible for the data described below. Questions go to{' '}
         <a href="mailto:hi@bgreen.lol">hi@bgreen.lol</a>.
       </p>
 
       <h2>What it stores</h2>
-      <p>Only what is needed to build your calendar:</p>
+      <p>Only what is needed to build your feeds:</p>
       <ul>
         <li>
           <strong>Your Buffer account details</strong> — account ID, email address, name, and time
@@ -60,16 +61,17 @@ privacyRoutes.get('/privacy', (c) =>
           written to logs, never shown back to you, and never sent anywhere except Buffer's own API.
         </li>
         <li>
-          <strong>Your calendar settings</strong> — which organization and channels you chose, the
-          event length, refresh interval, date window, and which post statuses to include.
+          <strong>Your output settings</strong> — which organization and channels you chose, the
+          output format (ICS or Atom), event length, refresh interval, date window, and which post
+          statuses to include.
         </li>
         <li>
           <strong>A session cookie</strong> — a random identifier that keeps you signed in for 30
           days. It is not used for tracking and carries no personal data.
         </li>
         <li>
-          <strong>Sync bookkeeping</strong> — timestamps of the last fetch, how many events were
-          produced, and any error message, so the dashboard can show whether syncing works.
+          <strong>Sync bookkeeping</strong> — timestamps of the last fetch, how many events or items
+          were produced, and any error message, so the dashboard can show whether syncing works.
         </li>
       </ul>
 
@@ -131,7 +133,7 @@ privacyRoutes.get('/privacy', (c) =>
         </li>
       </ul>
       <p>
-        social cally's use and transfer of information received from Google APIs to any other app
+        social sindy's use and transfer of information received from Google APIs to any other app
         will adhere to the{' '}
         <a
           href="https://developers.google.com/terms/api-services-user-data-policy"

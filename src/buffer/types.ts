@@ -45,6 +45,8 @@ export interface BufferPost {
   channelId: string;
   channelService: string;
   shareMode: string | null;
+  /** External link the post points to, if any (e.g. a blog post URL). */
+  externalLink?: string | null;
   tags: BufferTag[];
   error: BufferPublishingError | null;
   assets: BufferAsset[];

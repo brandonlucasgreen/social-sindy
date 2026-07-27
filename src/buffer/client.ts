@@ -107,6 +107,7 @@ const POST_FIELDS = `
   channelId
   channelService
   shareMode
+  externalLink
   tags { id name }
   error { message supportUrl }
   assets { type mimeType source thumbnail }

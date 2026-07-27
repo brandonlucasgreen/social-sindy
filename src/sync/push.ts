@@ -1,9 +1,11 @@
 /**
- * Pushes a calendar's posts into a dedicated Google calendar.
+ * Pushes an ICS output's posts into a dedicated Google calendar.
  *
  * This is the only mechanism that makes Google fast: a subscribed ICS feed is
  * re-fetched on Google's own 8–24 hour schedule, whereas events written through
  * the API appear immediately.
+ *
+ * Only runs for ICS outputs with push_enabled = 1.
  */
 
 import {
@@ -22,12 +24,12 @@ import {
   getGoogleCredential,
   recordPush,
   setGoogleCalendarId,
-  type CalendarWithChannels,
+  type OutputWithChannels,
 } from '../db.js';
 import type { Env } from '../env.js';
 import type { ChannelRef } from '../present.js';
 import { googleConfig } from './google-config.js';
-import { postsForCalendar, windowFor } from './posts.js';
+import { postsForOutput, windowFor } from './posts.js';
 import { isPlanEmpty, planSync, type SyncPlan } from './reconcile.js';
 
 export interface PushStats {
@@ -38,7 +40,7 @@ export interface PushStats {
 }
 
 /**
- * Ceiling on writes per run. A calendar whose whole window changed at once
+ * Ceiling on writes per run. An output whose whole window changed at once
  * should not turn into thousands of Google calls in a single cron tick; the
  * remainder is picked up on the next pass.
  */
@@ -47,9 +49,9 @@ const MAX_WRITES_PER_RUN = 250;
 /** Google's per-user rate limits punish bursts, so writes go out in small waves. */
 const WRITE_CONCURRENCY = 4;
 
-function channelRefs(calendar: CalendarWithChannels): Map<string, ChannelRef> {
+function channelRefs(output: OutputWithChannels): Map<string, ChannelRef> {
   return new Map(
-    calendar.channels.map((row) => [
+    output.channels.map((row) => [
       row.channel_id,
       { id: row.channel_id, name: row.channel_name, service: row.service },
     ]),
@@ -127,29 +129,29 @@ export interface PushOutcome {
 /**
  * Ensures the dedicated Google calendar exists, then reconciles it.
  *
- * Errors are recorded against the calendar and rethrown, so the scheduler can
- * carry on with other calendars while the UI still shows what went wrong.
+ * Errors are recorded against the output and rethrown, so the scheduler can
+ * carry on with other outputs while the UI still shows what went wrong.
  */
-export async function pushCalendar(
+export async function pushOutput(
   env: Env,
-  calendar: CalendarWithChannels,
+  output: OutputWithChannels,
   now: Date = new Date(),
 ): Promise<PushOutcome> {
   const config = googleConfig(env);
   if (!config) throw new GoogleAuthError('Google push is not configured on this deployment');
 
   try {
-    const accessToken = await googleAccessToken(env, calendar.user_id, config);
+    const accessToken = await googleAccessToken(env, output.user_id, config);
     const client = new GoogleCalendarClient(accessToken);
 
-    let googleCalendarId = calendar.google_calendar_id;
+    let googleCalendarId = output.google_calendar_id;
     if (!googleCalendarId) {
-      googleCalendarId = await client.createCalendar(calendar.name, calendar.user_timezone ?? 'UTC');
-      await setGoogleCalendarId(env.DB, calendar.id, googleCalendarId);
+      googleCalendarId = await client.createCalendar(output.name, output.user_timezone ?? 'UTC');
+      await setGoogleCalendarId(env.DB, output.id, googleCalendarId);
     }
 
-    const { bundle } = await postsForCalendar(env, calendar, now);
-    const { start, end } = windowFor(calendar, now);
+    const { bundle } = await postsForOutput(env, output, now);
+    const { start, end } = windowFor(output, now);
 
     let existing: ExistingEvent[];
     try {
@@ -158,7 +160,7 @@ export async function pushCalendar(
       // The user may have deleted the calendar in Google. Forget it and let the
       // next run recreate it, rather than failing forever.
       if (error instanceof GoogleApiError && (error.isNotFound || error.status === 410)) {
-        await clearGoogleCalendar(env.DB, calendar.id);
+        await clearGoogleCalendar(env.DB, output.id);
         throw new GoogleApiError(
           'That Google calendar no longer exists. It will be recreated on the next sync.',
           error.status,
@@ -167,14 +169,14 @@ export async function pushCalendar(
       throw error;
     }
 
-    const plan = planSync(bundle.posts, existing, channelRefs(calendar), {
-      eventDurationMinutes: calendar.event_duration_minutes,
-      showChannelInTitle: calendar.show_channel_in_title === 1,
-      timeZone: calendar.user_timezone ?? 'UTC',
+    const plan = planSync(bundle.posts, existing, channelRefs(output), {
+      eventDurationMinutes: output.event_duration_minutes,
+      showChannelInTitle: output.show_channel_in_title === 1,
+      timeZone: output.user_timezone ?? 'UTC',
     });
 
     if (isPlanEmpty(plan)) {
-      await recordPush(env.DB, calendar.id, {
+      await recordPush(env.DB, output.id, {
         stats: { created: 0, updated: 0, deleted: 0, unchanged: plan.unchanged },
         error: null,
       });
@@ -182,12 +184,12 @@ export async function pushCalendar(
     }
 
     const stats = await runWrites(plan, googleCalendarId, client);
-    await recordPush(env.DB, calendar.id, { stats, error: null });
+    await recordPush(env.DB, output.id, { stats, error: null });
 
     return { stats, noop: false };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    await recordPush(env.DB, calendar.id, { stats: null, error: message });
+    await recordPush(env.DB, output.id, { stats: null, error: message });
     throw error;
   }
 }

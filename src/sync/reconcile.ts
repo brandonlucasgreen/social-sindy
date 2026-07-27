@@ -85,7 +85,7 @@ export function toGoogleEvent(
     summary: eventTitle(post, channel, options),
     description: eventDescription(post, channel),
     start: { dateTime: start.toISOString(), timeZone: options.timeZone },
-    end: { dateTime: postEnd(start, options).toISOString(), timeZone: options.timeZone },
+    end: { dateTime: postEnd(start, options.eventDurationMinutes ?? 15).toISOString(), timeZone: options.timeZone },
     status: isTentative(post) ? 'tentative' : 'confirmed',
     // Informational, not time the user is busy.
     transparency: 'transparent',

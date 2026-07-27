@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { BufferRateLimitError } from '../src/buffer/client.js';
 import { cachedFeed, etagFor, respondWithFeed } from '../src/feed.js';
-import type { CalendarWithChannels } from '../src/db.js';
+import type { OutputWithChannels } from '../src/db.js';
 import type { Env } from '../src/env.js';
 
 /** In-memory stand-in for a KV namespace, with TTL recorded rather than enforced. */
@@ -35,13 +35,14 @@ function fakeDb(): D1Database {
   return { prepare: () => statement, batch: async () => [] } as unknown as D1Database;
 }
 
-function calendar(overrides: Partial<CalendarWithChannels> = {}): CalendarWithChannels {
+function output(overrides: Partial<OutputWithChannels> = {}): OutputWithChannels {
   return {
-    id: 'cal_1',
+    id: 'out_1',
     user_id: 'usr_1',
     organization_id: 'org_1',
     organization_name: 'Cult of Lightbulbs',
     name: 'Buffer — Cult of Lightbulbs',
+    format: 'ics',
     feed_token: 'tok',
     event_duration_minutes: 15,
     refresh_minutes: 60,
@@ -49,6 +50,8 @@ function calendar(overrides: Partial<CalendarWithChannels> = {}): CalendarWithCh
     window_future_days: 90,
     statuses: 'scheduled,sent',
     show_channel_in_title: 1,
+    max_items: 50,
+    group_cross_posts: 1,
     created_at: '2026-07-01T00:00:00.000Z',
     updated_at: '2026-07-01T00:00:00.000Z',
     last_polled_at: null,
@@ -61,7 +64,7 @@ function calendar(overrides: Partial<CalendarWithChannels> = {}): CalendarWithCh
     last_push_error: null,
     last_push_stats: null,
     channels: [
-      { calendar_id: 'cal_1', channel_id: 'ch_a', channel_name: 'kidlightbulbs', service: 'threads' },
+      { output_id: 'out_1', channel_id: 'ch_a', channel_name: 'kidlightbulbs', service: 'threads' },
     ],
     ...overrides,
   };
@@ -84,7 +87,7 @@ describe('cachedFeed', () => {
     const kv = fakeKv();
     const render = vi.fn(async () => ICS_A);
 
-    const result = await cachedFeed(env(kv.namespace), calendar(), render);
+    const result = await cachedFeed(env(kv.namespace), output(), render);
 
     expect(result).toMatchObject({ body: ICS_A, cached: false, stale: false, eventCount: 1 });
     expect(render).toHaveBeenCalledTimes(1);
@@ -94,38 +97,38 @@ describe('cachedFeed', () => {
     // This is the property that stops a public URL from draining a user's quota.
     const kv = fakeKv();
     const render = vi.fn(async () => ICS_A);
-    const cal = calendar();
+    const out = output();
 
-    await cachedFeed(env(kv.namespace), cal, render);
-    for (let i = 0; i < 25; i++) await cachedFeed(env(kv.namespace), cal, render);
+    await cachedFeed(env(kv.namespace), out, render);
+    for (let i = 0; i < 25; i++) await cachedFeed(env(kv.namespace), out, render);
 
     expect(render).toHaveBeenCalledTimes(1);
   });
 
-  it('caches for the calendar\'s refresh interval', async () => {
+  it('caches for the output\'s refresh interval', async () => {
     const kv = fakeKv();
-    await cachedFeed(env(kv.namespace), calendar({ refresh_minutes: 360 }), async () => ICS_A);
+    await cachedFeed(env(kv.namespace), output({ refresh_minutes: 360 }), async () => ICS_A);
 
-    expect(kv.store.get('feed:fresh:cal_1:2026-07-01T00:00:00.000Z')?.ttl).toBe(360 * 60);
+    expect(kv.store.get('feed:fresh:out_1:2026-07-01T00:00:00.000Z')?.ttl).toBe(360 * 60);
   });
 
   it('never sets a TTL below the KV minimum', async () => {
     const kv = fakeKv();
-    await cachedFeed(env(kv.namespace), calendar({ refresh_minutes: 0 }), async () => ICS_A);
+    await cachedFeed(env(kv.namespace), output({ refresh_minutes: 0 }), async () => ICS_A);
 
-    expect(kv.store.get('feed:fresh:cal_1:2026-07-01T00:00:00.000Z')?.ttl).toBe(60);
+    expect(kv.store.get('feed:fresh:out_1:2026-07-01T00:00:00.000Z')?.ttl).toBe(60);
   });
 
-  it('invalidates the cache when calendar settings change', async () => {
+  it('invalidates the cache when output settings change', async () => {
     // updated_at is part of the cache key, so an edit takes effect immediately
     // rather than after the refresh interval elapses.
     const kv = fakeKv();
     const render = vi.fn(async () => ICS_A);
 
-    await cachedFeed(env(kv.namespace), calendar(), render);
+    await cachedFeed(env(kv.namespace), output(), render);
     await cachedFeed(
       env(kv.namespace),
-      calendar({ updated_at: '2026-07-02T00:00:00.000Z' }),
+      output({ updated_at: '2026-07-02T00:00:00.000Z' }),
       render,
     );
 
@@ -134,13 +137,13 @@ describe('cachedFeed', () => {
 
   it('serves the last good render when Buffer fails', async () => {
     const kv = fakeKv();
-    const cal = calendar();
-    await cachedFeed(env(kv.namespace), cal, async () => ICS_A);
+    const out = output();
+    await cachedFeed(env(kv.namespace), out, async () => ICS_A);
 
     // Expire the fresh entry, leaving only the long-lived fallback.
-    kv.store.delete('feed:fresh:cal_1:2026-07-01T00:00:00.000Z');
+    kv.store.delete('feed:fresh:out_1:2026-07-01T00:00:00.000Z');
 
-    const result = await cachedFeed(env(kv.namespace), cal, async () => {
+    const result = await cachedFeed(env(kv.namespace), out, async () => {
       throw new Error('Buffer is down');
     });
 
@@ -149,22 +152,22 @@ describe('cachedFeed', () => {
 
   it('backs off using Retry-After when rate limited', async () => {
     const kv = fakeKv();
-    const cal = calendar();
-    await cachedFeed(env(kv.namespace), cal, async () => ICS_A);
-    kv.store.delete('feed:fresh:cal_1:2026-07-01T00:00:00.000Z');
+    const out = output();
+    await cachedFeed(env(kv.namespace), out, async () => ICS_A);
+    kv.store.delete('feed:fresh:out_1:2026-07-01T00:00:00.000Z');
 
-    await cachedFeed(env(kv.namespace), cal, async () => {
+    await cachedFeed(env(kv.namespace), out, async () => {
       throw new BufferRateLimitError(900, []);
     });
 
-    expect(kv.store.get('feed:fresh:cal_1:2026-07-01T00:00:00.000Z')?.ttl).toBe(900);
+    expect(kv.store.get('feed:fresh:out_1:2026-07-01T00:00:00.000Z')?.ttl).toBe(900);
   });
 
   it('propagates the failure when there is no previous render to fall back on', async () => {
     const kv = fakeKv();
 
     await expect(
-      cachedFeed(env(kv.namespace), calendar(), async () => {
+      cachedFeed(env(kv.namespace), output(), async () => {
         throw new Error('Buffer is down');
       }),
     ).rejects.toThrow('Buffer is down');
@@ -172,14 +175,14 @@ describe('cachedFeed', () => {
 
   it('keeps the fallback alive across a later successful render', async () => {
     const kv = fakeKv();
-    const cal = calendar();
+    const out = output();
 
-    await cachedFeed(env(kv.namespace), cal, async () => ICS_A);
-    kv.store.delete('feed:fresh:cal_1:2026-07-01T00:00:00.000Z');
-    await cachedFeed(env(kv.namespace), cal, async () => ICS_B);
+    await cachedFeed(env(kv.namespace), out, async () => ICS_A);
+    kv.store.delete('feed:fresh:out_1:2026-07-01T00:00:00.000Z');
+    await cachedFeed(env(kv.namespace), out, async () => ICS_B);
 
-    expect(kv.store.get('feed:last-good:cal_1')?.value).toBe(ICS_B);
-    expect(kv.store.get('feed:last-good:cal_1')?.ttl).toBe(7 * 86_400);
+    expect(kv.store.get('feed:last-good:out_1')?.value).toBe(ICS_B);
+    expect(kv.store.get('feed:last-good:out_1')?.ttl).toBe(7 * 86_400);
   });
 });
 
@@ -197,13 +200,13 @@ describe('etagFor', () => {
 describe('respondWithFeed', () => {
   const url = 'https://example.com/feed/tok.ics';
 
-  it('serves the calendar with the right content type and cache headers', async () => {
+  it('serves the ICS feed with the right content type and cache headers', async () => {
     const kv = fakeKv();
-    await kv.namespace.put('feed:fresh:cal_1:2026-07-01T00:00:00.000Z', ICS_A);
+    await kv.namespace.put('feed:fresh:out_1:2026-07-01T00:00:00.000Z', ICS_A);
 
     const response = await respondWithFeed(
       env(kv.namespace),
-      calendar(),
+      output(),
       new Request(url),
     );
 
@@ -214,14 +217,30 @@ describe('respondWithFeed', () => {
     expect(await response.text()).toBe(ICS_A);
   });
 
+  it('serves an Atom feed with the right content type', async () => {
+    const atomBody = '<?xml version="1.0" encoding="UTF-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom"><entry></entry></feed>';
+    const kv = fakeKv();
+    await kv.namespace.put('feed:fresh:out_1:2026-07-01T00:00:00.000Z', atomBody);
+
+    const response = await respondWithFeed(
+      env(kv.namespace),
+      output({ format: 'atom' }),
+      new Request('https://example.com/feed/tok.xml'),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe('application/atom+xml; charset=utf-8');
+    expect(response.headers.get('Content-Disposition')).toBeNull();
+  });
+
   it('answers 304 when the client already has this version', async () => {
     const kv = fakeKv();
-    await kv.namespace.put('feed:fresh:cal_1:2026-07-01T00:00:00.000Z', ICS_A);
+    await kv.namespace.put('feed:fresh:out_1:2026-07-01T00:00:00.000Z', ICS_A);
     const etag = await etagFor(ICS_A);
 
     const response = await respondWithFeed(
       env(kv.namespace),
-      calendar(),
+      output(),
       new Request(url, { headers: { 'If-None-Match': etag } }),
     );
 
@@ -231,11 +250,11 @@ describe('respondWithFeed', () => {
 
   it('omits the body for HEAD but keeps the headers', async () => {
     const kv = fakeKv();
-    await kv.namespace.put('feed:fresh:cal_1:2026-07-01T00:00:00.000Z', ICS_A);
+    await kv.namespace.put('feed:fresh:out_1:2026-07-01T00:00:00.000Z', ICS_A);
 
     const response = await respondWithFeed(
       env(kv.namespace),
-      calendar(),
+      output(),
       new Request(url, { method: 'HEAD' }),
     );
 
@@ -246,10 +265,10 @@ describe('respondWithFeed', () => {
 
   it('flags a stale render so the problem is visible', async () => {
     const kv = fakeKv();
-    await kv.namespace.put('feed:last-good:cal_1', ICS_A);
+    await kv.namespace.put('feed:last-good:out_1', ICS_A);
 
     // No stored credential, so the render fails and the fallback is used.
-    const response = await respondWithFeed(env(kv.namespace), calendar(), new Request(url));
+    const response = await respondWithFeed(env(kv.namespace), output(), new Request(url));
 
     expect(response.status).toBe(200);
     expect(response.headers.get('X-Feed-Stale')).toBe('true');
@@ -259,7 +278,7 @@ describe('respondWithFeed', () => {
     // A 401 would make calendar clients prompt for credentials they cannot send.
     const kv = fakeKv();
 
-    const response = await respondWithFeed(env(kv.namespace), calendar(), new Request(url));
+    const response = await respondWithFeed(env(kv.namespace), output(), new Request(url));
 
     expect(response.status).toBe(503);
     expect(response.headers.get('Retry-After')).toBeTruthy();

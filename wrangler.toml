@@ -1,15 +1,15 @@
-name = "social-cally"
+name = "social-sindy"
 main = "src/index.tsx"
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Custom Domain, not a route: Cloudflare creates the proxied DNS record and
-# provisions the certificate itself. A hand-made CNAME to workers.dev would not
-# route here.
-#
-# Declaring any route turns `workers_dev` off by default, so the old
-# *.workers.dev origin is now dead and this is the only way in. That is
-# deliberate — one origin means one OAuth redirect URI and one feed hostname.
+# Custom Domain: the merged product lives at social-sindy.bgreen.lol.
+# social-cally.bgreen.lol will redirect here once the merge is deployed.
+[[routes]]
+pattern = "social-sindy.bgreen.lol"
+custom_domain = true
+
+# Also serve from the old domain so existing ICS subscribers aren't broken.
 [[routes]]
 pattern = "social-cally.bgreen.lol"
 custom_domain = true
@@ -22,8 +22,8 @@ id = "359e9d98dbf94c20b2fdaae903caa471"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "social-cally"
-database_id = "eeb8eac6-1ac5-4a07-aa91-58a34120146e"
+database_name = "social-sindy"
+database_id = "45ffa1c1-ff0c-4e69-b678-128557f0e629"
 
 # Drives the Google Calendar push. Fires often; each calendar's own refresh
 # interval decides whether it is actually due, so a once-a-day calendar is not
@@ -42,7 +42,7 @@ crons = ["*/5 * * * *"]
 [vars]
 # Public base URL, used to build the feed URLs shown to the user and the OAuth
 # redirect URI. Must match the deployed origin exactly.
-APP_BASE_URL = "https://social-cally.bgreen.lol"
+APP_BASE_URL = "https://social-sindy.bgreen.lol"
 
 # Buffer OAuth client ID for "Sign in with Buffer". A client ID is public — it
 # ships in the redirect URL every user's browser follows — so it belongs here in

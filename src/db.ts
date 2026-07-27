@@ -1,6 +1,9 @@
 /**
  * D1 data access. Thin, explicit SQL rather than an ORM — the schema is small
  * and the query shapes matter for a Worker's latency budget.
+ *
+ * Unified around the `outputs` table: one Buffer org + channel selection → one
+ * feed URL, in either ICS or Atom format.
  */
 
 import { randomId, randomToken } from './crypto.js';
@@ -23,43 +26,51 @@ export interface CredentialRow {
   fingerprint: string;
 }
 
-export interface CalendarRow {
+export type OutputFormat = 'ics' | 'atom';
+
+export interface OutputRow {
   id: string;
   user_id: string;
   organization_id: string;
   organization_name: string;
   name: string;
+  format: OutputFormat;
   feed_token: string;
+  // ICS-specific
   event_duration_minutes: number;
+  show_channel_in_title: number;
+  // Atom-specific
+  max_items: number;
+  group_cross_posts: number;
+  // Shared
   refresh_minutes: number;
   window_past_days: number;
   window_future_days: number;
   statuses: string;
-  show_channel_in_title: number;
+  // Google Calendar push (ICS only)
+  google_calendar_id: string | null;
+  push_enabled: number;
+  last_push_at: string | null;
+  last_push_error: string | null;
+  last_push_stats: string | null;
+  // Observability
   created_at: string;
   updated_at: string;
   last_polled_at: string | null;
   last_fetched_at: string | null;
   last_event_count: number | null;
   last_error: string | null;
-  /** Set once the dedicated Google calendar has been created. */
-  google_calendar_id: string | null;
-  push_enabled: number;
-  last_push_at: string | null;
-  last_push_error: string | null;
-  /** JSON {created,updated,deleted,unchanged} from the most recent run. */
-  last_push_stats: string | null;
 }
 
-export interface CalendarChannelRow {
-  calendar_id: string;
+export interface OutputChannelRow {
+  output_id: string;
   channel_id: string;
   channel_name: string;
   service: string;
 }
 
-export interface CalendarWithChannels extends CalendarRow {
-  channels: CalendarChannelRow[];
+export interface OutputWithChannels extends OutputRow {
+  channels: OutputChannelRow[];
   /** Joined from the owning user, for stamping Google events with a zone. */
   user_timezone?: string;
 }
@@ -196,10 +207,10 @@ export async function deleteUser(db: D1Database, userId: string): Promise<void> 
   await db.batch([
     db
       .prepare(
-        'DELETE FROM calendar_channels WHERE calendar_id IN (SELECT id FROM calendars WHERE user_id = ?)',
+        'DELETE FROM output_channels WHERE output_id IN (SELECT id FROM outputs WHERE user_id = ?)',
       )
       .bind(userId),
-    db.prepare('DELETE FROM calendars WHERE user_id = ?').bind(userId),
+    db.prepare('DELETE FROM outputs WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM credentials WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM buffer_oauth_credentials WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM google_credentials WHERE user_id = ?').bind(userId),
@@ -314,8 +325,8 @@ export async function deleteGoogleCredential(db: D1Database, userId: string): Pr
     db.prepare('DELETE FROM google_credentials WHERE user_id = ?').bind(userId),
     db
       .prepare(
-        `UPDATE calendars SET push_enabled = 0, google_calendar_id = NULL, last_push_error = NULL
-         WHERE user_id = ?`,
+        `UPDATE outputs SET push_enabled = 0, google_calendar_id = NULL, last_push_error = NULL
+         WHERE user_id = ? AND format = 'ics'`,
       )
       .bind(userId),
   ]);
@@ -325,36 +336,36 @@ export async function deleteGoogleCredential(db: D1Database, userId: string): Pr
 
 export async function setPushEnabled(
   db: D1Database,
-  calendarId: string,
+  outputId: string,
   enabled: boolean,
 ): Promise<void> {
   await db
-    .prepare('UPDATE calendars SET push_enabled = ?, last_push_error = NULL, updated_at = ? WHERE id = ?')
-    .bind(enabled ? 1 : 0, now(), calendarId)
+    .prepare('UPDATE outputs SET push_enabled = ?, last_push_error = NULL, updated_at = ? WHERE id = ?')
+    .bind(enabled ? 1 : 0, now(), outputId)
     .run();
 }
 
 export async function setGoogleCalendarId(
   db: D1Database,
-  calendarId: string,
+  outputId: string,
   googleCalendarId: string,
 ): Promise<void> {
   await db
-    .prepare('UPDATE calendars SET google_calendar_id = ? WHERE id = ?')
-    .bind(googleCalendarId, calendarId)
+    .prepare('UPDATE outputs SET google_calendar_id = ? WHERE id = ?')
+    .bind(googleCalendarId, outputId)
     .run();
 }
 
-export async function clearGoogleCalendar(db: D1Database, calendarId: string): Promise<void> {
+export async function clearGoogleCalendar(db: D1Database, outputId: string): Promise<void> {
   await db
-    .prepare('UPDATE calendars SET google_calendar_id = NULL WHERE id = ?')
-    .bind(calendarId)
+    .prepare('UPDATE outputs SET google_calendar_id = NULL WHERE id = ?')
+    .bind(outputId)
     .run();
 }
 
 export async function recordPush(
   db: D1Database,
-  calendarId: string,
+  outputId: string,
   outcome: {
     stats: { created: number; updated: number; deleted: number; unchanged: number } | null;
     error: string | null;
@@ -362,44 +373,45 @@ export async function recordPush(
 ): Promise<void> {
   await db
     .prepare(
-      `UPDATE calendars SET last_push_at = ?, last_push_stats = ?, last_push_error = ? WHERE id = ?`,
+      `UPDATE outputs SET last_push_at = ?, last_push_stats = ?, last_push_error = ? WHERE id = ?`,
     )
     .bind(
       now(),
       outcome.stats ? JSON.stringify(outcome.stats) : null,
       outcome.error,
-      calendarId,
+      outputId,
     )
     .run();
 }
 
 /**
- * Calendars whose push is due, oldest first.
+ * ICS outputs whose push is due, oldest first.
  *
- * The cron fires on a fixed interval; each calendar's own refresh setting
- * decides whether it is actually due, so a once-a-day calendar is not synced
+ * The cron fires on a fixed interval; each output's own refresh setting
+ * decides whether it is actually due, so a once-a-day output is not synced
  * every five minutes.
  */
-export async function calendarsDueForPush(
+export async function outputsDueForPush(
   db: D1Database,
   now: Date,
   limit: number,
-): Promise<CalendarWithChannels[]> {
+): Promise<OutputWithChannels[]> {
   const { results } = await db
     .prepare(
-      `SELECT calendars.*, users.timezone AS user_timezone FROM calendars
-       JOIN users ON users.id = calendars.user_id
-       WHERE calendars.push_enabled = 1
-         AND calendars.google_calendar_id IS NOT NULL
+      `SELECT outputs.*, users.timezone AS user_timezone FROM outputs
+       JOIN users ON users.id = outputs.user_id
+       WHERE outputs.format = 'ics'
+         AND outputs.push_enabled = 1
+         AND outputs.google_calendar_id IS NOT NULL
          AND (
-           calendars.last_push_at IS NULL
-           OR julianday(?) - julianday(calendars.last_push_at) >= calendars.refresh_minutes / 1440.0
+           outputs.last_push_at IS NULL
+           OR julianday(?) - julianday(outputs.last_push_at) >= outputs.refresh_minutes / 1440.0
          )
-       ORDER BY calendars.last_push_at IS NOT NULL, calendars.last_push_at ASC
+       ORDER BY outputs.last_push_at IS NOT NULL, outputs.last_push_at ASC
        LIMIT ?`,
     )
     .bind(now.toISOString(), limit)
-    .all<CalendarRow & { user_timezone: string }>();
+    .all<OutputRow & { user_timezone: string }>();
 
   return attachChannels(db, results ?? []);
 }
@@ -435,27 +447,33 @@ export async function deleteSession(db: D1Database, sessionId: string): Promise<
   await db.prepare('DELETE FROM sessions WHERE id = ?').bind(sessionId).run();
 }
 
-// -- calendars --------------------------------------------------------------
+// -- outputs ----------------------------------------------------------------
 
-export interface CreateCalendarInput {
+export interface CreateOutputInput {
   userId: string;
   organizationId: string;
   organizationName: string;
   name: string;
+  format: OutputFormat;
   channels: { id: string; name: string; service: string }[];
+  // ICS-specific
   eventDurationMinutes: number;
+  showChannelInTitle: boolean;
+  // Atom-specific
+  maxItems: number;
+  groupCrossPosts: boolean;
+  // Shared
   refreshMinutes: number;
   windowPastDays: number;
   windowFutureDays: number;
   statuses: PostStatus[];
-  showChannelInTitle: boolean;
 }
 
-export async function createCalendar(
+export async function createOutput(
   db: D1Database,
-  input: CreateCalendarInput,
-): Promise<CalendarRow> {
-  const id = randomId('cal');
+  input: CreateOutputInput,
+): Promise<OutputRow> {
+  const id = randomId('out');
   // 32 random bytes: the feed URL is unauthenticated, so the token is the only
   // thing standing between the URL and the post content behind it.
   const feedToken = randomToken(32);
@@ -464,11 +482,12 @@ export async function createCalendar(
   const statements = [
     db
       .prepare(
-        `INSERT INTO calendars (
-           id, user_id, organization_id, organization_name, name, feed_token,
-           event_duration_minutes, refresh_minutes, window_past_days, window_future_days,
-           statuses, show_channel_in_title, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO outputs (
+           id, user_id, organization_id, organization_name, name, format, feed_token,
+           event_duration_minutes, show_channel_in_title, max_items, group_cross_posts,
+           refresh_minutes, window_past_days, window_future_days, statuses,
+           created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -476,20 +495,23 @@ export async function createCalendar(
         input.organizationId,
         input.organizationName,
         input.name,
+        input.format,
         feedToken,
         input.eventDurationMinutes,
+        input.showChannelInTitle ? 1 : 0,
+        input.maxItems,
+        input.groupCrossPosts ? 1 : 0,
         input.refreshMinutes,
         input.windowPastDays,
         input.windowFutureDays,
         serializeStatuses(input.statuses),
-        input.showChannelInTitle ? 1 : 0,
         timestamp,
         timestamp,
       ),
     ...input.channels.map((channel) =>
       db
         .prepare(
-          `INSERT INTO calendar_channels (calendar_id, channel_id, channel_name, service)
+          `INSERT INTO output_channels (output_id, channel_id, channel_name, service)
            VALUES (?, ?, ?, ?)`,
         )
         .bind(id, channel.id, channel.name, channel.service),
@@ -498,175 +520,183 @@ export async function createCalendar(
 
   await db.batch(statements);
 
-  const created = await db.prepare('SELECT * FROM calendars WHERE id = ?').bind(id).first<CalendarRow>();
-  if (!created) throw new Error('Failed to persist calendar');
+  const created = await db.prepare('SELECT * FROM outputs WHERE id = ?').bind(id).first<OutputRow>();
+  if (!created) throw new Error('Failed to persist output');
   return created;
 }
 
 async function attachChannels(
   db: D1Database,
-  calendars: CalendarRow[],
-): Promise<CalendarWithChannels[]> {
-  if (!calendars.length) return [];
+  outputs: OutputRow[],
+): Promise<OutputWithChannels[]> {
+  if (!outputs.length) return [];
 
-  const placeholders = calendars.map(() => '?').join(',');
+  const placeholders = outputs.map(() => '?').join(',');
   const { results } = await db
-    .prepare(`SELECT * FROM calendar_channels WHERE calendar_id IN (${placeholders})`)
-    .bind(...calendars.map((c) => c.id))
-    .all<CalendarChannelRow>();
+    .prepare(`SELECT * FROM output_channels WHERE output_id IN (${placeholders})`)
+    .bind(...outputs.map((o) => o.id))
+    .all<OutputChannelRow>();
 
-  const byCalendar = new Map<string, CalendarChannelRow[]>();
+  const byOutput = new Map<string, OutputChannelRow[]>();
   for (const row of results ?? []) {
-    const list = byCalendar.get(row.calendar_id) ?? [];
+    const list = byOutput.get(row.output_id) ?? [];
     list.push(row);
-    byCalendar.set(row.calendar_id, list);
+    byOutput.set(row.output_id, list);
   }
 
-  return calendars.map((calendar) => ({
-    ...calendar,
-    channels: byCalendar.get(calendar.id) ?? [],
+  return outputs.map((output) => ({
+    ...output,
+    channels: byOutput.get(output.id) ?? [],
   }));
 }
 
-export async function listCalendars(
+export async function listOutputs(
   db: D1Database,
   userId: string,
-): Promise<CalendarWithChannels[]> {
+): Promise<OutputWithChannels[]> {
   const { results } = await db
     .prepare(
-      `SELECT calendars.*, users.timezone AS user_timezone FROM calendars
-       JOIN users ON users.id = calendars.user_id
-       WHERE calendars.user_id = ? ORDER BY calendars.created_at DESC`,
+      `SELECT outputs.*, users.timezone AS user_timezone FROM outputs
+       JOIN users ON users.id = outputs.user_id
+       WHERE outputs.user_id = ? ORDER BY outputs.created_at DESC`,
     )
     .bind(userId)
-    .all<CalendarRow>();
+    .all<OutputRow>();
 
   return attachChannels(db, results ?? []);
 }
 
-export async function getCalendar(
+export async function getOutput(
   db: D1Database,
-  calendarId: string,
+  outputId: string,
   userId: string,
-): Promise<CalendarWithChannels | null> {
-  const calendar = await db
+): Promise<OutputWithChannels | null> {
+  const output = await db
     .prepare(
-      `SELECT calendars.*, users.timezone AS user_timezone FROM calendars
-       JOIN users ON users.id = calendars.user_id
-       WHERE calendars.id = ? AND calendars.user_id = ?`,
+      `SELECT outputs.*, users.timezone AS user_timezone FROM outputs
+       JOIN users ON users.id = outputs.user_id
+       WHERE outputs.id = ? AND outputs.user_id = ?`,
     )
-    .bind(calendarId, userId)
-    .first<CalendarRow>();
+    .bind(outputId, userId)
+    .first<OutputRow>();
 
-  if (!calendar) return null;
-  return (await attachChannels(db, [calendar]))[0] ?? null;
+  if (!output) return null;
+  return (await attachChannels(db, [output]))[0] ?? null;
 }
 
-/** Looks up a calendar by its public feed token, for the unauthenticated feed. */
-export async function getCalendarByToken(
+/** Looks up an output by its public feed token, for the unauthenticated feed. */
+export async function getOutputByToken(
   db: D1Database,
   token: string,
-): Promise<CalendarWithChannels | null> {
-  const calendar = await db
+): Promise<OutputWithChannels | null> {
+  const output = await db
     .prepare(
-      `SELECT calendars.*, users.timezone AS user_timezone FROM calendars
-       JOIN users ON users.id = calendars.user_id
-       WHERE calendars.feed_token = ?`,
+      `SELECT outputs.*, users.timezone AS user_timezone FROM outputs
+       JOIN users ON users.id = outputs.user_id
+       WHERE outputs.feed_token = ?`,
     )
     .bind(token)
-    .first<CalendarRow>();
+    .first<OutputRow>();
 
-  if (!calendar) return null;
-  return (await attachChannels(db, [calendar]))[0] ?? null;
+  if (!output) return null;
+  return (await attachChannels(db, [output]))[0] ?? null;
 }
 
-export interface UpdateCalendarInput {
+export interface UpdateOutputInput {
   name: string;
   channels: { id: string; name: string; service: string }[];
+  // ICS-specific
   eventDurationMinutes: number;
+  showChannelInTitle: boolean;
+  // Atom-specific
+  maxItems: number;
+  groupCrossPosts: boolean;
+  // Shared
   refreshMinutes: number;
   windowPastDays: number;
   windowFutureDays: number;
   statuses: PostStatus[];
-  showChannelInTitle: boolean;
 }
 
-export async function updateCalendar(
+export async function updateOutput(
   db: D1Database,
-  calendarId: string,
-  input: UpdateCalendarInput,
+  outputId: string,
+  input: UpdateOutputInput,
 ): Promise<void> {
   await db.batch([
     db
       .prepare(
-        `UPDATE calendars SET
-           name = ?, event_duration_minutes = ?, refresh_minutes = ?,
-           window_past_days = ?, window_future_days = ?, statuses = ?,
-           show_channel_in_title = ?, updated_at = ?
+        `UPDATE outputs SET
+           name = ?, event_duration_minutes = ?, show_channel_in_title = ?,
+           max_items = ?, group_cross_posts = ?,
+           refresh_minutes = ?, window_past_days = ?, window_future_days = ?,
+           statuses = ?, updated_at = ?
          WHERE id = ?`,
       )
       .bind(
         input.name,
         input.eventDurationMinutes,
+        input.showChannelInTitle ? 1 : 0,
+        input.maxItems,
+        input.groupCrossPosts ? 1 : 0,
         input.refreshMinutes,
         input.windowPastDays,
         input.windowFutureDays,
         serializeStatuses(input.statuses),
-        input.showChannelInTitle ? 1 : 0,
         now(),
-        calendarId,
+        outputId,
       ),
-    db.prepare('DELETE FROM calendar_channels WHERE calendar_id = ?').bind(calendarId),
+    db.prepare('DELETE FROM output_channels WHERE output_id = ?').bind(outputId),
     ...input.channels.map((channel) =>
       db
         .prepare(
-          `INSERT INTO calendar_channels (calendar_id, channel_id, channel_name, service)
+          `INSERT INTO output_channels (output_id, channel_id, channel_name, service)
            VALUES (?, ?, ?, ?)`,
         )
-        .bind(calendarId, channel.id, channel.name, channel.service),
+        .bind(outputId, channel.id, channel.name, channel.service),
     ),
   ]);
 }
 
 /** Invalidates the old feed URL by issuing a new token. */
-export async function rotateFeedToken(db: D1Database, calendarId: string): Promise<string> {
+export async function rotateFeedToken(db: D1Database, outputId: string): Promise<string> {
   const token = randomToken(32);
   await db
-    .prepare('UPDATE calendars SET feed_token = ?, updated_at = ? WHERE id = ?')
-    .bind(token, now(), calendarId)
+    .prepare('UPDATE outputs SET feed_token = ?, updated_at = ? WHERE id = ?')
+    .bind(token, now(), outputId)
     .run();
   return token;
 }
 
-export async function deleteCalendar(db: D1Database, calendarId: string): Promise<void> {
+export async function deleteOutput(db: D1Database, outputId: string): Promise<void> {
   await db.batch([
-    db.prepare('DELETE FROM calendar_channels WHERE calendar_id = ?').bind(calendarId),
-    db.prepare('DELETE FROM calendars WHERE id = ?').bind(calendarId),
+    db.prepare('DELETE FROM output_channels WHERE output_id = ?').bind(outputId),
+    db.prepare('DELETE FROM outputs WHERE id = ?').bind(outputId),
   ]);
 }
 
 /** Records that a client polled the feed, whether or not Buffer was hit. */
 export async function recordPoll(
   db: D1Database,
-  calendarId: string,
+  outputId: string,
   outcome: { fetched: boolean; eventCount?: number; error?: string | null },
 ): Promise<void> {
   const timestamp = now();
 
   if (!outcome.fetched) {
     await db
-      .prepare('UPDATE calendars SET last_polled_at = ? WHERE id = ?')
-      .bind(timestamp, calendarId)
+      .prepare('UPDATE outputs SET last_polled_at = ? WHERE id = ?')
+      .bind(timestamp, outputId)
       .run();
     return;
   }
 
   await db
     .prepare(
-      `UPDATE calendars SET
+      `UPDATE outputs SET
          last_polled_at = ?, last_fetched_at = ?, last_event_count = ?, last_error = ?
        WHERE id = ?`,
     )
-    .bind(timestamp, timestamp, outcome.eventCount ?? null, outcome.error ?? null, calendarId)
+    .bind(timestamp, timestamp, outcome.eventCount ?? null, outcome.error ?? null, outputId)
     .run();
 }

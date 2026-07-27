@@ -1,8 +1,8 @@
 {
-  "name": "social-cally",
+  "name": "social-sindy",
   "version": "0.1.0",
   "private": true,
-  "description": "Sync your Buffer publishing schedule to Google Calendar, Apple Calendar, and Outlook via a subscribable iCalendar feed.",
+  "description": "Turns your Buffer publishing schedule and history into subscribable feeds — calendar feeds (ICS) and content feeds (Atom/RSS) — from a single OAuth connection.",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:migrate:local": "wrangler d1 migrations apply social-cally --local",
-    "db:migrate:remote": "wrangler d1 migrations apply social-cally --remote",
+    "db:migrate:local": "wrangler d1 migrations apply social-sindy --local",
+    "db:migrate:remote": "wrangler d1 migrations apply social-sindy --remote",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
