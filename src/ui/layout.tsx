@@ -548,14 +548,6 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
             &middot;{' '}
             <a href="/faq">FAQ</a>{' '}
             &middot;{' '}
-            <a
-              href="https://liberapay.com/brandonlucasgreen"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Donate
-            </a>{' '}
-            &middot;{' '}
             <a href="/privacy" target="_blank" rel="noopener noreferrer">
               Privacy policy
             </a>
