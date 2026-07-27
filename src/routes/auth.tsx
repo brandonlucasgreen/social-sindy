@@ -1,18 +1,12 @@
 /**
  * Connecting a Buffer account, which is also how a user signs in.
  *
- * Two ways in, and which appear depends on this deployment's configuration.
+ * Sign in with Buffer (OAuth, authorization code + PKCE) is the only public
+ * auth path. It asks for read-only scopes, so the tool can never publish.
  *
- * "Sign in with Buffer" (OAuth, authorization code + PKCE) is preferred and
- * shown first wherever a client is registered, because it can ask for
- * read-only scopes. It needs a public HTTPS redirect URI, so it cannot be
- * exercised from plain localhost.
- *
- * Pasting a personal API key remains as the fallback, and stays supported
- * indefinitely for the accounts that already use one. A key grants full account
- * access including publishing, which the page says plainly.
- *
- * Either way the result is identical downstream: a user row plus a credential.
+ * The pasted-key path is removed from the UI but the route remains for any
+ * accounts that already use one. A key grants full account access including
+ * publishing.
  */
 
 import { Hono } from 'hono';
@@ -56,8 +50,6 @@ import { SESSION_COOKIE } from '../session.js';
 
 export const authRoutes = new Hono<AppBindings>();
 
-const KEY_SETTINGS_URL = 'https://publish.buffer.com/settings/api';
-
 /** The OAuth round trip holds its PKCE verifier server-side, never in a cookie. */
 const STATE_TTL_SECONDS = 600;
 
@@ -100,55 +92,13 @@ const HeroDemo = () => (
   </figure>
 );
 
-/** The pasted-key path. Primary when no OAuth client is registered, tucked
- *  behind a disclosure when there is one. */
-const ApiKeyForm = ({ labelled }: { labelled?: boolean }) => (
-  <form method="post" action="/connect">
-    {labelled ? <label for="apiKey">Buffer API key</label> : null}
-    <div class="inline-form">
-      <input
-        type="password"
-        id="apiKey"
-        name="apiKey"
-        required
-        autocomplete="off"
-        spellcheck={false}
-        placeholder="Paste your Buffer API key"
-      />
-      <button type="submit">Connect Buffer</button>
-    </div>
-    <small style="display:block;margin-top:0.625rem">
-      Create a key under{' '}
-      <a href={KEY_SETTINGS_URL} target="_blank" rel="noreferrer noopener">
-        Buffer → Settings → API
-      </a>
-      . Connecting it also signs you in - there is no separate account.
-    </small>
-  </form>
-);
-
-/**
- * Shown wherever the key field is, including behind the disclosure - a warning
- * about pasting a credential is worth nothing if it is not next to the box the
- * credential goes into.
- */
-const ApiKeyWarning = () => (
-  <Notice>
-    <p>
-      <strong>Worth knowing before you paste:</strong> A Buffer API key grants full access to your
-      Buffer account, including publishing. This tool only ever reads, but a key is a broad
-      credential, so make sure to keep this API key safe.
-    </p>
-  </Notice>
-);
-
-function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
+function ConnectPage({ error }: { error?: string }) {
   return (
-    <Layout title="social sindy — your Buffer queue as feeds">
+    <Layout title="social sindy - your Buffer queue as feeds">
       <h1>Your content schedule, as feeds you actually subscribe to.</h1>
       <p class="lede">
         Connect Buffer, choose your channels, and get a calendar feed (ICS) for Google Calendar,
-        Apple Calendar, or Outlook — plus a content feed (Atom/RSS) for your blog or RSS reader.
+        Apple Calendar, or Outlook - plus a content feed (Atom/RSS) for your blog or RSS reader.
         One connection, both formats.
       </p>
 
@@ -156,41 +106,22 @@ function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
 
       {error ? <Notice kind="error">{error}</Notice> : null}
 
-      {oauth ? (
-        <>
-          <div class="btn-row">
-            <a class="btn" href="/auth/buffer">
-              Sign in with Buffer
-            </a>
-          </div>
-          <small style="display:block;margin-top:0.625rem">
-            Buffer will ask you to approve <strong>read-only</strong> access to your account and
-            posts. Signing in also creates your account here — there is nothing separate to set up.
-          </small>
-
-          <details style="margin-top:1.5rem">
-            <summary>Use an API key instead</summary>
-            <p class="small" style="margin-top:0.75rem">
-              Only needed if signing in does not work for you — signing in above is the safer
-              route.
-            </p>
-            <ApiKeyForm />
-            <ApiKeyWarning />
-          </details>
-        </>
-      ) : (
-        <>
-          <ApiKeyForm labelled />
-          <ApiKeyWarning />
-        </>
-      )}
+      <div class="btn-row">
+        <a class="btn" href="/auth/buffer">
+          Sign in with Buffer
+        </a>
+      </div>
+      <small style="display:block;margin-top:0.625rem">
+        Buffer will ask you to approve <strong>read-only</strong> access to your account and
+        posts. Signing in also creates your account here - there is nothing separate to set up.
+      </small>
 
       <h2>What can you use it for?</h2>
       <div class="use-cases">
         <div class="use-case">
           <div class="use-case-icon">📅</div>
           <h3>Team calendar</h3>
-          <p>Add your content schedule to a shared Google Calendar or Outlook so the whole team can see what's coming up — without logging into Buffer.</p>
+          <p>Add your content schedule to a shared Google Calendar or Outlook so the whole team can see what's coming up - without logging into Buffer.</p>
         </div>
         <div class="use-case">
           <div class="use-case-icon">✉️</div>
@@ -205,7 +136,17 @@ function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
         <div class="use-case">
           <div class="use-case-icon">🌐</div>
           <h3>Website widget</h3>
-          <p>Embed a cross-network feed on your site — every channel in one place, not separate widgets for each social network.</p>
+          <p>Embed a cross-network feed on your site - every channel in one place, not separate widgets for each social network.</p>
+        </div>
+        <div class="use-case">
+          <div class="use-case-icon">🗂️</div>
+          <h3>Content archive</h3>
+          <p>A searchable record of everything you've posted, always available even if a platform changes or disappears.</p>
+        </div>
+        <div class="use-case">
+          <div class="use-case-icon">🔗</div>
+          <h3>Anything that reads a feed</h3>
+          <p>ICS and Atom are open standards - any tool that accepts a calendar URL or RSS URL just works. The possibilities are wide open.</p>
         </div>
       </div>
 
@@ -249,7 +190,7 @@ function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
 
 authRoutes.get('/', (c) => {
   if (c.get('user')) return c.redirect('/sindies', 302);
-  return c.html(<ConnectPage oauth={bufferOAuthConfig(c.env) !== null} />);
+  return c.html(<ConnectPage />);
 });
 
 // -- sign in with buffer (oauth) ---------------------------------------------
@@ -263,7 +204,7 @@ function connectFailed(
   message: string,
   status: 400 | 429 | 501 | 502 = 400,
 ) {
-  return c.html(<ConnectPage error={message} oauth={bufferOAuthConfig(c.env) !== null} />, status);
+  return c.html(<ConnectPage error={message} />, status);
 }
 
 /** What the round trip parks in KV, keyed by the `state` it hands the browser. */
@@ -311,7 +252,7 @@ async function consumeState(c: AppContext, state: string | undefined): Promise<A
 authRoutes.get('/auth/buffer', async (c) => {
   const config = bufferOAuthConfig(c.env);
   if (!config) {
-    return connectFailed(c, 'This deployment has no Buffer sign-in configured. Use an API key.', 501);
+    return connectFailed(c, 'This deployment has no Buffer sign-in configured.', 501);
   }
 
   return c.redirect(await beginAuthorization(c, config, true), 302);
@@ -320,7 +261,7 @@ authRoutes.get('/auth/buffer', async (c) => {
 authRoutes.get('/auth/callback', async (c) => {
   const config = bufferOAuthConfig(c.env);
   if (!config) {
-    return connectFailed(c, 'This deployment has no Buffer sign-in configured. Use an API key.', 501);
+    return connectFailed(c, 'This deployment has no Buffer sign-in configured.', 501);
   }
 
   const denied = c.req.query('error');
@@ -388,7 +329,7 @@ authRoutes.get('/auth/callback', async (c) => {
   if (!tokens.refreshToken && !onFile) {
     return connectFailed(
       c,
-      'Buffer signed you in but did not return a durable authorization, so the calendar could not be kept up to date. Revoke this app under your Buffer account settings and sign in again, or use an API key.',
+      'Buffer signed you in but did not return a durable authorization, so the calendar could not be kept up to date. Revoke this app under your Buffer account settings and sign in again.',
     );
   }
 
