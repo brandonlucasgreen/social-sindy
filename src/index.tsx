@@ -24,6 +24,7 @@ import type { Env } from './env.js';
 import { respondWithFeed } from './feed.js';
 import { authRoutes } from './routes/auth.jsx';
 import { outputRoutes } from './routes/outputs.jsx';
+import { faqRoutes } from './routes/faq.jsx';
 import { googleRoutes } from './routes/google.jsx';
 import { privacyRoutes } from './routes/privacy.jsx';
 import { withUser, type AppBindings } from './session.js';
@@ -88,6 +89,7 @@ app.use('*', withUser);
 
 app.route('/', privacyRoutes);
 app.route('/', authRoutes);
+app.route('/', faqRoutes);
 app.route('/', outputRoutes);
 app.route('/', googleRoutes);
 

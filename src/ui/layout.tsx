@@ -110,6 +110,9 @@ body {
 /* Our own mark, deliberately not Buffer's. Drawn in src/ui/mark.tsx. */
 .brand-mark { display: block; width: 1.5rem; height: 1.5rem; flex: none; }
 .brand-mark svg { display: block; width: 100%; height: 100%; }
+.nav-links { display: flex; align-items: center; gap: 0.75rem; font-size: 0.875rem; color: var(--text-dim); }
+.nav-links a { color: var(--text-dim); text-decoration: none; }
+.nav-links a:hover { color: var(--text); text-decoration: underline; }
 
 .who { display: flex; align-items: center; gap: 0.75rem; font-size: 0.875rem; color: var(--text-dim); }
 .who form { display: contents; }
@@ -421,6 +424,16 @@ button[disabled], .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform
   .day:has(> b:only-child) { display: none; }
 }
 
+/* --- faq --------------------------------------------------------------- */
+
+.faq-item { margin-bottom: 2rem; }
+.faq-item h2 { font-size: 1.0625rem; font-weight: 600; margin-bottom: 0.5rem; }
+.faq-item h2 a { color: var(--text); text-decoration: none; }
+.faq-item h2 a:hover { text-decoration: underline; }
+.faq-item p { margin-bottom: 0.75rem; max-width: 68ch; }
+.faq-item ul { max-width: 68ch; margin-bottom: 0.75rem; padding-left: 1.25rem; }
+.faq-item li { margin-bottom: 0.5rem; }
+
 /* --- trust grid --------------------------------------------------------- */
 
 .trust { display: grid; gap: 0.875rem; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
@@ -491,6 +504,9 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
             <Mark />
             social sindy
           </a>
+          <span class="nav-links">
+            <a href="/faq">FAQ</a>
+          </span>
           {user ? (
             <span class="who">
               {user.email}

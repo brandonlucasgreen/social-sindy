@@ -220,6 +220,9 @@ function ConnectPage({ error, oauth }: { error?: string; oauth: boolean }) {
         </div>
       </div>
 
+      <p style="margin-top:1.5rem">
+        <a href="/faq">More questions? Read the FAQ</a>
+      </p>
     </Layout>
   );
 }
