@@ -214,7 +214,7 @@ button[disabled], .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform
 
 /* --- format toggle (ICS / Atom) ---------------------------------------- */
 
-.format-toggle { display: flex; gap: 0; border-radius: var(--pill); overflow: hidden; border: 1px solid var(--border); }
+.format-toggle { display: inline-flex; gap: 0; border-radius: var(--pill); overflow: hidden; border: 1px solid var(--border); }
 .fmt-btn {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 0.5rem 1.25rem; font: inherit; font-size: 0.9375rem; font-weight: 600;

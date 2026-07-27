@@ -21,9 +21,7 @@ import {
   type OutputFormat,
   type OutputWithChannels,
 } from '../db.js';
-import { getGoogleCredential } from '../db.js';
 import { serviceColor, serviceLabel } from '../present.js';
-import { googleConfig } from '../sync/google-config.js';
 import { Layout, Notice, Steps } from '../ui/layout.jsx';
 import {
   accountFor,
@@ -374,13 +372,6 @@ const SharedSettingsFields: FC<{ settings: SindySettings }> = ({ settings }) => 
 function feedUrls(baseUrl: string, token: string, format: OutputFormat) {
   const ext = format === 'ics' ? '.ics' : '.xml';
   const https = `${baseUrl.replace(/\/$/, '')}/feed/${token}${ext}`;
-  if (format === 'ics') {
-    return {
-      https,
-      webcal: https.replace(/^https?:/, 'webcal:'),
-      google: `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(https)}`,
-    };
-  }
   return { https };
 }
 
@@ -399,38 +390,6 @@ function syncState(output: OutputWithChannels): { cls: string; text: string } {
     cls: stale ? 'stale' : '',
     text: `Refreshed ${when}${output.last_event_count !== null ? ` · ${output.last_event_count} ${noun}` : ''}`,
   };
-}
-
-function pushStatus(output: OutputWithChannels): { cls: string; text: string } | null {
-  if (output.last_push_error) {
-    return { cls: 'bad', text: `Last sync failed: ${output.last_push_error}` };
-  }
-  if (!output.last_push_at) return { cls: 'stale', text: 'Not synced yet' };
-
-  const ageMinutes = Math.round((Date.now() - Date.parse(output.last_push_at)) / 60_000);
-  const when =
-    ageMinutes < 1 ? 'just now' : ageMinutes < 60 ? `${ageMinutes}m ago` : `${Math.round(ageMinutes / 60)}h ago`;
-
-  let detail = '';
-  if (output.last_push_stats) {
-    try {
-      const stats = JSON.parse(output.last_push_stats) as {
-        created: number;
-        updated: number;
-        deleted: number;
-      };
-      const parts = [
-        stats.created ? `${stats.created} added` : '',
-        stats.updated ? `${stats.updated} updated` : '',
-        stats.deleted ? `${stats.deleted} removed` : '',
-      ].filter(Boolean);
-      detail = parts.length ? ` · ${parts.join(', ')}` : ' · no changes';
-    } catch {
-      // Malformed stats are cosmetic
-    }
-  }
-
-  return { cls: '', text: `Synced ${when}${detail}` };
 }
 
 const FORMAT_LABEL: Record<OutputFormat, string> = {
@@ -717,9 +676,6 @@ outputRoutes.get('/sindies/:id', async (c) => {
   const state = syncState(output);
 
   const isIcs = output.format === 'ics';
-  const pushAvailable = isIcs && googleConfig(c.env) !== null;
-  const googleConnected = pushAvailable && (await getGoogleCredential(c.env.DB, user.id)) !== null;
-  const pushState = isIcs ? pushStatus(output) : null;
 
   return c.html(
     <Layout title={`${output.name} — social sindy`} user={user}>
@@ -743,16 +699,6 @@ outputRoutes.get('/sindies/:id', async (c) => {
             Copy
           </button>
         </div>
-        {isIcs ? (
-          <div class="btn-row">
-            <a class="btn" href={urls.google!} target="_blank" rel="noreferrer noopener">
-              Add to Google Calendar
-            </a>
-            <a class="btn btn-quiet" href={urls.webcal!}>
-              Add to Apple Calendar
-            </a>
-          </div>
-        ) : null}
       </div>
 
       {isIcs ? (
@@ -778,22 +724,6 @@ outputRoutes.get('/sindies/:id', async (c) => {
         </Notice>
       )}
 
-      {isIcs ? (
-        <>
-          <h2>Manual setup</h2>
-          <div class="panel">
-            <p class="small">
-              <strong>Google Calendar:</strong> Other calendars → + → From URL → paste the URL above.
-              <br />
-              <strong>Apple Calendar:</strong> File → New Calendar Subscription → paste the URL, then set
-              Auto-refresh.
-              <br />
-              <strong>Outlook:</strong> Add calendar → Subscribe from web → paste the URL.
-            </p>
-          </div>
-        </>
-      ) : null}
-
       <h2>Status</h2>
       <div class="panel">
         <p class="small">
@@ -812,72 +742,6 @@ outputRoutes.get('/sindies/:id', async (c) => {
           )}
         </p>
       </div>
-
-      {isIcs ? (
-        <>
-          <h2>Google Calendar sync</h2>
-          {!pushAvailable ? (
-            <div class="panel">
-              <p class="small">
-                Direct Google sync is not configured on this deployment, so the subscription URL above is
-                the way to get this into Google — refreshed on Google's own schedule.
-              </p>
-            </div>
-          ) : output.push_enabled === 1 ? (
-            <div class="panel">
-              <h3>On</h3>
-              <p class="small">
-                Events are written straight into a Google calendar named "{output.name}", so changes
-                appear within your refresh interval instead of waiting on Google's 8-24 hour polling.
-                Only events created by this tool are ever touched.
-              </p>
-              {pushState ? (
-                <p class="meta-line">
-                  <span class={`state ${pushState.cls}`} />
-                  {pushState.text}
-                </p>
-              ) : null}
-              <div class="btn-row">
-                <form method="post" action={`/sindies/${output.id}/push/now`}>
-                  <button class="btn btn-quiet" type="submit">
-                    Sync now
-                  </button>
-                </form>
-                <form method="post" action={`/sindies/${output.id}/push/disable`}>
-                  <button class="btn btn-quiet" type="submit">
-                    Turn off
-                  </button>
-                </form>
-                <form
-                  method="post"
-                  action={`/sindies/${output.id}/push/remove`}
-                  onsubmit="return confirm('Delete the Google calendar this tool created, and all events in it?')"
-                >
-                  <button class="btn-danger" type="submit">
-                    Delete the Google calendar
-                  </button>
-                </form>
-              </div>
-            </div>
-          ) : (
-            <div class="panel">
-              <p class="small">
-                Google ignores the refresh interval on subscribed URLs. Turning this on writes events
-                directly into a dedicated Google calendar instead, so changes land within minutes.
-              </p>
-              <p class="small">
-                It asks for one permission — create a calendar and manage events on calendars it created.
-                It cannot see your existing calendars.
-              </p>
-              <div class="btn-row">
-                <form method="post" action={`/sindies/${output.id}/push/enable`}>
-                  <button type="submit">{googleConnected ? 'Turn on Google sync' : 'Connect Google'}</button>
-                </form>
-              </div>
-            </div>
-          )}
-        </>
-      ) : null}
 
       <h2>Manage</h2>
       <div class="panel">
