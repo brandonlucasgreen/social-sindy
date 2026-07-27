@@ -138,7 +138,7 @@ function emitEntry(
 
   // Full post text as HTML content
   const description = eventDescriptionHtml(post, channels[0]);
-  lines.push(`    <content type="html">${description}</content>`);
+  lines.push(`    <content type="html"><![CDATA[${description}]]></content>`);
 
   // Media attachments
   for (const asset of post.assets) {

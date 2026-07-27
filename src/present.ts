@@ -200,29 +200,32 @@ export function eventDescription(post: BufferPost, channel: ChannelRef | undefin
   return sections.join('\n\n');
 }
 
-/** HTML variant of eventDescription for Atom feeds, where \n renders as a space. */
+/** HTML variant of eventDescription for Atom feeds.
+ *
+ * Wrapped in CDATA in the XML, so no XML escaping needed — the HTML
+ * tags are literal and will be rendered by the feed reader. */
 export function eventDescriptionHtml(post: BufferPost, channel: ChannelRef | undefined): string {
   const service = channel?.service ?? post.channelService;
   const sections: string[] = [];
 
-  if (post.text?.trim()) sections.push(escapeXml(post.text.trim()));
+  if (post.text?.trim()) sections.push(post.text.trim());
 
   const facts: string[] = [
-    `Channel: ${escapeXml(channel?.name ?? '(unknown)')} (${escapeXml(serviceLabel(service))})`,
+    `Channel: ${channel?.name ?? '(unknown)'} (${serviceLabel(service)})`,
   ];
 
   if (post.externalLink) {
-    facts.push(`<a href="${escapeXml(post.externalLink)}">View on ${escapeXml(serviceLabel(service))}</a>`);
+    facts.push(`<a href="${post.externalLink}">View on ${serviceLabel(service)}</a>`);
   } else {
-    facts.push(`<a href="${escapeXml(bufferPostUrl(post.id))}">Open in Buffer</a>`);
+    facts.push(`<a href="${bufferPostUrl(post.id)}">Open in Buffer</a>`);
   }
 
-  if (post.tags.length) facts.push(`Tags: ${post.tags.map((t) => escapeXml(t.name)).join(', ')}`);
+  if (post.tags.length) facts.push(`Tags: ${post.tags.map((t) => t.name).join(', ')}`);
   if (post.assets.length) {
     const kinds = post.assets.map((a) => a.type ?? 'attachment');
     facts.push(`Media: ${post.assets.length} (${[...new Set(kinds)].join(', ')})`);
   }
-  if (post.error) facts.push(`Error: ${escapeXml(post.error.message)}`);
+  if (post.error) facts.push(`Error: ${post.error.message}`);
 
   sections.push(facts.join('<br>'));
   return sections.join('<br><br>');

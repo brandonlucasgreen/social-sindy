@@ -43,7 +43,7 @@ describe('generateAtom', () => {
     expect(xml.trim().endsWith('</feed>')).toBe(true);
   });
 
-  it('escapes XML special characters in text', () => {
+  it('wraps HTML content in CDATA, keeping user content safe from XML parsing', () => {
     const posts = [mockPost({ text: '<script>alert("xss")</script> & stuff' })];
     const channels = new Map([['ch_1', { id: 'ch_1', name: 'My Channel', service: 'bluesky' }]]);
 
@@ -55,8 +55,12 @@ describe('generateAtom', () => {
       groupCrossPosts: false,
     });
 
-    expect(xml).not.toContain('<script>');
+    // The <title> must still be XML-escaped (not in CDATA)
     expect(xml).toContain('&lt;script&gt;');
+
+    // The <content> must be wrapped in CDATA so HTML renders in readers
+    expect(xml).toContain('<content type="html"><![CDATA[');
+    expect(xml).toContain(']]></content>');
   });
 
   it('groups cross-posts when enabled', () => {
