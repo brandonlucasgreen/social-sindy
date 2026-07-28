@@ -19,10 +19,10 @@ import { generateEncryptionKey, openSecret, sealSecret } from '../src/crypto.js'
 
 const ACCOUNT = {
   id: 'acct-1',
-  email: 'brandon@buffer.com',
-  name: 'Brandon',
+  email: 'user@example.com',
+  name: 'Test User',
   timezone: 'Europe/London',
-  organizations: [{ id: 'org-1', name: 'Cult of Lightbulbs' }],
+  organizations: [{ id: 'org-1', name: 'Example Org' }],
 };
 
 function fakeKV() {

@@ -65,10 +65,10 @@ const ACCOUNT_BODY = {
   data: {
     account: {
       id: 'acct_1',
-      email: 'brandon@buffer.com',
-      name: 'Brandon Lucas Green',
+      email: 'user@example.com',
+      name: 'Test User',
       timezone: 'America/New_York',
-      organizations: [{ id: 'org_1', name: 'Cult of Lightbulbs', ownerEmail: 'brandon@buffer.com' }],
+      organizations: [{ id: 'org_1', name: 'Example Org', ownerEmail: 'user@example.com' }],
     },
   },
 };
@@ -90,7 +90,7 @@ describe('BufferClient', () => {
 
     const result = await new BufferClient('k', fetchImpl as unknown as typeof fetch).getAccount();
 
-    expect(result.data.email).toBe('brandon@buffer.com');
+    expect(result.data.email).toBe('user@example.com');
     expect(result.rateLimit).toEqual([{ policy: '250-in-24h', remaining: 249, resetSeconds: 86000 }]);
   });
 

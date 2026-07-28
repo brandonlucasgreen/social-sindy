@@ -163,7 +163,17 @@ The project had an earlier name, from when it produced calendars only. That name
 
 ## Contributing
 
-Pull requests are welcome, though this is a personal project with a narrow scope — please open an issue before starting anything substantial. `main` is protected: changes land via pull request with `pnpm typecheck` and `pnpm test` passing.
+Pull requests are welcome, though this is a personal project with a narrow scope — please open an issue before starting anything substantial.
+
+`main` carries a ruleset: it cannot be force-pushed or deleted, and changes land via pull request with the `check` job — `pnpm typecheck` and `pnpm test` — passing. Review is requested automatically via [CODEOWNERS](.github/CODEOWNERS).
+
+CI runs on `pull_request`, so a pull request from a fork executes with no access to anything: the workflow token is read-only, and the repository stores no Actions secrets. Nothing in this repo needs a credential to build or test. Workflow actions are pinned to commit SHAs, and `pnpm install --frozen-lockfile` plus pnpm's `onlyBuiltDependencies` allowlist mean a pull request cannot introduce a package that executes code at install time.
+
+## Security
+
+Please report vulnerabilities privately — see [SECURITY.md](SECURITY.md). Do not open a public issue for a security problem.
+
+No credentials belong in this repository. The OAuth client IDs in [wrangler.toml](wrangler.toml) are public by design; the D1 and KV identifiers next to them are resource names, not credentials, and are useless without authenticated access to the Cloudflare account. Everything genuinely secret is set with `wrangler secret put` and lives only in Cloudflare.
 
 ## License
 
