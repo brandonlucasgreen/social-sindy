@@ -41,6 +41,8 @@ ICS sindies can optionally push events directly into a dedicated Google calendar
 
 ## Naming
 
-The product is called **social sindy**. The primary domain is `socialsindy.com`; `social-sindy.bgreen.lol` and `social-cally.bgreen.lol` (the former name, from when it did calendars only) stay routed so existing subscribers' feed URLs keep working. The hyphenated `social-sindy` appears in the package name, Worker name, D1 database name, and ICS UID domain. The spaced `social sindy` appears in the UI, page titles, and privacy policy.
+The product is called **social sindy**. The primary domain is `socialsindy.com`. Two older hostnames, `social-sindy.bgreen.lol` and `social-cally.bgreen.lol`, stay routed so existing subscribers' feed URLs keep working — they are compatibility, not names.
+
+The hyphenated `social-sindy` is the identifier everywhere one is needed: package name, Worker name, D1 database name, and ICS UID domain. The spaced `social sindy` appears in the UI, page titles, and privacy policy. The project's earlier calendars-only name is retired and should not appear in code, config, or copy.
 
 "Sindy" is a syndication pun — **S**yndication + **Indy** (independent).

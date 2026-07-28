@@ -140,7 +140,7 @@ Feed routes are registered ahead of the session and CSRF middleware on purpose: 
 
 ### Domains
 
-`socialsindy.com` is primary. `social-sindy.bgreen.lol` and `social-cally.bgreen.lol` (the project's former name) remain routed so existing subscribers' feed URLs keep working.
+`socialsindy.com` is primary. Two older hostnames, `social-sindy.bgreen.lol` and `social-cally.bgreen.lol`, remain routed to the same Worker — not because the names are still in use, but because feed URLs on them are sitting in real calendar clients and RSS readers. Dropping a route silently breaks every subscriber pointed at it.
 
 ## Principles
 
@@ -157,7 +157,9 @@ Early versions let you paste a Buffer personal API key instead of using OAuth. T
 
 ## Naming
 
-The product is **social sindy** — a syndication pun, **S**yndication + **Indy** (independent). The hyphenated `social-sindy` appears in the package name, Worker name, D1 database name, and ICS UID domain. The spaced `social sindy` appears in the UI, page titles, and privacy policy. It was previously called social-cally, when it did calendars only.
+The product is **social sindy** — a syndication pun, **S**yndication + **Indy** (independent). The hyphenated `social-sindy` is the identifier everywhere one is needed: package name, Worker name, D1 database name, and ICS UID domain. The spaced `social sindy` appears in the UI, page titles, and privacy policy.
+
+The project had an earlier name, from when it produced calendars only. That name is retired and should not appear in code, config, or copy — the sole exception is the legacy hostname above, which exists for subscribers rather than as a name.
 
 ## Contributing
 
