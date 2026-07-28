@@ -1,8 +1,13 @@
 # Google OAuth verification
 
-Notes for submitting social-cally for verification of the
+Notes for submitting social sindy for verification of the
 `calendar.app.created` scope. Kept because verification recurs — a scope change
 or a new domain re-triggers it, and none of this is worth rediscovering.
+
+The values below are the current ones, on `socialsindy.com`. An earlier draft of
+this doc used the project's previous domain; if a half-finished submission in the
+Google Cloud console still carries those, update it before resubmitting, because
+the reviewer checks that every URL is live.
 
 ## The good news: sensitive, not restricted
 
@@ -73,10 +78,10 @@ The app keeps working for test users throughout.
 
 | Requirement | Value |
 | --- | --- |
-| App home page | `https://social-cally.bgreen.lol` |
-| Privacy policy | `https://social-cally.bgreen.lol/privacy` |
-| Authorized domain | `bgreen.lol` |
-| Redirect URI | `https://social-cally.bgreen.lol/google/callback` |
+| App home page | `https://socialsindy.com` |
+| Privacy policy | `https://socialsindy.com/privacy` |
+| Authorized domain | `socialsindy.com` |
+| Redirect URI | `https://socialsindy.com/google/callback` |
 | Logo | `assets/mark-120.png` (120×120; `mark-120-white.png` if transparency is refused) |
 
 All must be live and publicly reachable **at submission time** — the reviewer
@@ -98,7 +103,7 @@ Two things that are easy to miss:
 
 Paste something close to this, adjusting for tone:
 
-> social-cally turns a user's Buffer publishing schedule into a calendar. The
+> social sindy turns a user's Buffer publishing schedule into a calendar. The
 > optional Google Calendar sync creates one new secondary calendar in the user's
 > account and writes their scheduled social posts into it as events, so changes
 > appear within minutes rather than on the multi-hour cycle an ICS subscription

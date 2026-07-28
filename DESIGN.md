@@ -52,10 +52,10 @@ warning.
 
 ### Note on the warm palette
 
-An earlier revision of Social Sindy used a warm cream-and-amber palette, on the
-reasoning that a broadcast-oriented creative tool suited warm color. It was
-replaced with the cool palette above, which is closer to what social-cally
-originally used. The brand mark still carries the amber (see **Mark** below).
+An earlier revision used a warm cream-and-amber palette, on the reasoning that a
+broadcast-oriented creative tool suited warm color. It was replaced with the cool
+palette above, which is closer to what the project used before that. The brand
+mark still carries the amber (see **Mark** below).
 
 ## Typography
 
