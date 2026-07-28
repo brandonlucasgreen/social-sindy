@@ -42,6 +42,7 @@ describe('public pages', () => {
     { path: '/', canonical: `${ORIGIN}/` },
     { path: '/faq', canonical: `${ORIGIN}/faq` },
     { path: '/privacy', canonical: `${ORIGIN}/privacy` },
+    { path: '/terms', canonical: `${ORIGIN}/terms` },
   ];
 
   it.each(PUBLIC_PAGES)('$path is indexable', async ({ path }) => {
@@ -106,8 +107,8 @@ describe('robots.txt', () => {
 describe('sitemap.xml', () => {
   it('lists exactly the indexable pages, absolute', async () => {
     const xml = await body('/sitemap.xml');
-    expect(xml.match(/<loc>/g)).toHaveLength(3);
-    for (const path of ['/', '/faq', '/privacy']) {
+    expect(xml.match(/<loc>/g)).toHaveLength(4);
+    for (const path of ['/', '/faq', '/privacy', '/terms']) {
       expect(xml).toContain(`<loc>${ORIGIN}${path}</loc>`);
     }
   });

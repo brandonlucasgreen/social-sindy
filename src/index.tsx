@@ -18,6 +18,7 @@
 import { Hono } from 'hono';
 import { csrf } from 'hono/csrf';
 import { HTTPException } from 'hono/http-exception';
+import { secureHeaders } from 'hono/secure-headers';
 
 import { getOutputByToken, outputsDueForPush } from './db.js';
 import { appOrigin, type Env } from './env.js';
@@ -27,12 +28,124 @@ import { outputRoutes } from './routes/outputs.jsx';
 import { faqRoutes } from './routes/faq.jsx';
 import { googleRoutes } from './routes/google.jsx';
 import { privacyRoutes } from './routes/privacy.jsx';
+import { tosRoutes } from './routes/tos.jsx';
 import { withUser, type AppBindings } from './session.js';
 import { pushOutput } from './sync/push.js';
 import { Layout, Notice } from './ui/layout.jsx';
 import { MARK_SVG } from './ui/mark.jsx';
 
 const app = new Hono<AppBindings>();
+
+/**
+ * Canonical host. Two legacy `bgreen.lol` hostnames still resolve so existing
+ * ICS/Atom subscribers aren't broken, but every HTML surface should consolidate
+ * onto this one — three hosts serving identical marketing pages is duplicate
+ * content, and only this host is what canonical tags and the sitemap name.
+ */
+const CANONICAL_HOST = 'socialsindy.com';
+const LEGACY_HOSTS = new Set(['social-sindy.bgreen.lol', 'social-cally.bgreen.lol']);
+
+/**
+ * Baseline response hardening, applied ahead of every route including the
+ * feed — those responses sit behind an unguessable token but are still worth
+ * protecting from framing and MIME-sniffing. CSP is scoped to the app's only
+ * real dependencies: Google Fonts (styles/fonts), GoatCounter (pageview
+ * script + its own endpoint), and Cloudflare's own auto-injected RUM beacon.
+ *
+ * `'unsafe-inline'` on script-src and style-src is a real, known trade-off,
+ * not an oversight: the layout has a small inline bootstrap script (clipboard
+ * copy + the async font-loader below) and one inline `<style>` block, and
+ * neither is worth a per-request nonce-threading refactor across every route
+ * that renders `<Layout>` for what this app actually needs to defend against.
+ *
+ * Registered before the redirect middleware below, not after: Hono composes
+ * `app.use` in registration order, and a middleware that returns a response
+ * without calling `next()` — which the redirect below does for every request
+ * it redirects — skips everything registered later. Headers, including HSTS
+ * on the very response that's upgrading a visitor to HTTPS, must not depend
+ * on whether that particular request happened to redirect.
+ */
+app.use(
+  '*',
+  secureHeaders({
+    strictTransportSecurity: 'max-age=31536000; includeSubDomains',
+    xFrameOptions: 'DENY',
+    referrerPolicy: 'strict-origin-when-cross-origin',
+    // Empty arrays, not `false`: hono renders `false` as the legacy
+    // Feature-Policy token `none`, but the Permissions-Policy spec's
+    // structured-header syntax for "deny to everyone" is an empty list, `()`.
+    permissionsPolicy: { geolocation: [], camera: [], microphone: [] },
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+      objectSrc: ["'none'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", 'https://gc.zgo.at', 'https://static.cloudflareinsights.com'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:'],
+      connectSrc: [
+        "'self'",
+        'https://social-sindy.goatcounter.com',
+        'https://static.cloudflareinsights.com',
+      ],
+    },
+  }),
+);
+
+/**
+ * Upgrades plain HTTP to HTTPS everywhere, and consolidates the legacy hosts
+ * onto the canonical one — except for feed paths and the health check.
+ *
+ * Feed URLs are excluded from the host redirect on purpose: they contain a
+ * long-lived, unguessable token that existing calendar/RSS subscribers on the
+ * legacy hosts already have saved, and a subscriber's client software may not
+ * re-save a redirected URL. The HTTPS upgrade still applies to feed requests,
+ * though — a feed token is exactly the kind of thing that must never cross the
+ * wire in cleartext, so that half of this redirect is not optional for them.
+ *
+ * `/healthz` is excluded from the host redirect too, since an uptime monitor
+ * pinging a specific hostname wants a 200 from that host, not a redirect.
+ *
+ * 308, not 301: a permanent redirect that Google treats identically to 301 for
+ * indexing purposes, but that also preserves the request method — a stray POST
+ * arriving over plain HTTP should not be silently downgraded to a GET.
+ *
+ * The HTTPS check reads Cloudflare's `cf-visitor` header rather than
+ * `new URL(c.req.url).protocol`: `wrangler dev` rewrites the request URL's
+ * host to match this Worker's configured custom-domain route for realistic
+ * local testing, but always serves plain HTTP locally (no local TLS listener)
+ * — so the raw protocol can't tell "real plain-HTTP visitor" apart from
+ * "ordinary local dev request" and would redirect-loop `pnpm dev` forever.
+ * `cf-visitor` only exists behind Cloudflare's actual edge, so its absence
+ * safely means "not production" and this step is skipped, exactly as it is
+ * today with no redirect middleware at all.
+ */
+app.use('*', async (c, next) => {
+  const url = new URL(c.req.url);
+  const isLegacyHost =
+    LEGACY_HOSTS.has(url.hostname) && !url.pathname.startsWith('/feed/') && url.pathname !== '/healthz';
+
+  let needsHttps = false;
+  const cfVisitor = c.req.header('cf-visitor');
+  if (cfVisitor) {
+    try {
+      needsHttps = JSON.parse(cfVisitor).scheme === 'http';
+    } catch {
+      // Malformed header from an untrusted-in-shape source — ignore rather
+      // than let a parse failure misfire a redirect.
+    }
+  }
+
+  if (isLegacyHost || needsHttps) {
+    url.protocol = 'https:';
+    if (isLegacyHost) url.hostname = CANONICAL_HOST;
+    return c.redirect(url.toString(), 308);
+  }
+
+  return next();
+});
 
 /**
  * The feed is registered first and deliberately outside the session and CSRF
@@ -85,7 +198,7 @@ app.get('/icon.svg', (c) =>
  * other surface is either behind a session or a machine endpoint, and each of
  * these opts into indexing explicitly at its own `<Layout>`.
  */
-const INDEXABLE_PATHS = ['/', '/faq', '/privacy'];
+const INDEXABLE_PATHS = ['/', '/faq', '/privacy', '/terms'];
 
 /**
  * Paths no crawler should spend budget on.
@@ -149,6 +262,7 @@ app.use('*', csrf());
 app.use('*', withUser);
 
 app.route('/', privacyRoutes);
+app.route('/', tosRoutes);
 app.route('/', authRoutes);
 app.route('/', faqRoutes);
 app.route('/', outputRoutes);
