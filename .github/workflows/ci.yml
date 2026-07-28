@@ -1,0 +1,40 @@
+# Runs on every pull request into main, and on main itself so the branch's own
+# status is always known. Branch protection requires the `check` job, so the job
+# name here must stay in sync with the required-status-checks configuration.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# A new push to a PR makes the previous run's answer irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      # Reads the version from package.json's `packageManager` field, and caches
+      # the pnpm store keyed on the lockfile.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
