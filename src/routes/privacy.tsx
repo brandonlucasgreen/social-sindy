@@ -19,7 +19,7 @@ export const privacyRoutes = new Hono<AppBindings>();
  * Bumped whenever the substance changes, so the page can state honestly when it
  * was last revised.
  */
-const LAST_UPDATED = '26 July 2026';
+const LAST_UPDATED = '28 July 2026';
 
 privacyRoutes.get('/privacy', (c) =>
   c.html(
@@ -42,7 +42,8 @@ privacyRoutes.get('/privacy', (c) =>
           <strong>The short version.</strong> This tool reads your Buffer posting schedule and turns
           it into subscribable feeds — calendar feeds (ICS) and content feeds (Atom/RSS). It stores your
           Buffer credential encrypted, caches your posts briefly so it does not exhaust your Buffer API
-          quota, and never publishes anything, sells anything, or runs analytics or advertising. Deleting
+          quota, and never publishes anything, sells anything, or runs advertising. The only
+          measurement is a cookieless pageview count on the interface pages. Deleting
           your account erases everything it holds.
         </p>
       </Notice>
@@ -177,10 +178,25 @@ privacyRoutes.get('/privacy', (c) =>
           your IP address when you load a page. Nothing else about you is sent, and this happens on
           the interface pages only, never on the calendar feed itself.
         </li>
+        <li>
+          <strong>GoatCounter</strong> — the interface pages load a small script from{' '}
+          <code>gc.zgo.at</code> that counts pageviews, so the operator can see which pages get
+          used. It sets no cookies, assigns no persistent identifier, and does not track you across
+          sites. What is recorded is the page you loaded, the referring page, your browser and
+          screen size, and a country derived from your IP address; the IP itself is not stored, and
+          repeat visits are recognised via a temporary hash built from a salt that rotates
+          regularly, so the link back to you does not persist. The counts are
+          aggregate and are not linked to your account. See{' '}
+          <a href="https://www.goatcounter.com/help/privacy" target="_blank" rel="noreferrer noopener">
+            GoatCounter's privacy policy
+          </a>
+          . As with fonts, this runs on the interface pages only, never on the calendar feed itself.
+        </li>
       </ul>
       <p>
-        There are no analytics, no advertising, no third-party trackers, and no other embedded
-        services. Your data is never sold or shared for marketing.
+        Apart from that pageview count there is no analytics, no advertising, no third-party
+        trackers, and no other embedded services. Nothing profiles you, and your data is never sold
+        or shared for marketing.
       </p>
 
       <h2>Deleting your data</h2>
