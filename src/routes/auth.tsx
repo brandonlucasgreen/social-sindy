@@ -26,6 +26,7 @@ import {
 } from '../buffer/oauth.js';
 import { invalidateAccessToken } from '../buffer/token.js';
 import { fingerprintSecret, randomToken, sealSecret } from '../crypto.js';
+import { appOrigin } from '../env.js';
 import {
   deleteCredential,
   deleteSession,
@@ -92,9 +93,22 @@ const HeroDemo = () => (
   </figure>
 );
 
-function ConnectPage({ error }: { error?: string }) {
+/**
+ * The homepage doubles as the connect page, so it is both the marketing surface
+ * and the start of the OAuth flow. It is public and indexable; every other page
+ * this file renders is not.
+ */
+const HOME_DESCRIPTION =
+  'Turn your Buffer publishing schedule into feeds you can subscribe to: a calendar feed (ICS) for Google Calendar, Apple Calendar, or Outlook, and a content feed (Atom/RSS) for your blog or reader. One read-only connection, both formats.';
+
+function ConnectPage({ error, origin }: { error?: string; origin: string }) {
   return (
-    <Layout title="social sindy - your Buffer queue as feeds">
+    <Layout
+      title="social sindy - your Buffer queue as feeds"
+      description={HOME_DESCRIPTION}
+      canonical={`${origin}/`}
+      indexable
+    >
       <h1>Your content schedule, as feeds you actually subscribe to.</h1>
       <p class="lede">
         Connect Buffer, choose your channels, and get a calendar feed (ICS) for Google Calendar,
@@ -190,7 +204,7 @@ function ConnectPage({ error }: { error?: string }) {
 
 authRoutes.get('/', (c) => {
   if (c.get('user')) return c.redirect('/sindies', 302);
-  return c.html(<ConnectPage />);
+  return c.html(<ConnectPage origin={appOrigin(c.env)} />);
 });
 
 // -- sign in with buffer (oauth) ---------------------------------------------
@@ -204,7 +218,7 @@ function connectFailed(
   message: string,
   status: 400 | 429 | 501 | 502 = 400,
 ) {
-  return c.html(<ConnectPage error={message} />, status);
+  return c.html(<ConnectPage error={message} origin={appOrigin(c.env)} />, status);
 }
 
 /** What the round trip parks in KV, keyed by the `state` it hands the browser. */

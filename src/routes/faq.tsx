@@ -3,6 +3,7 @@
  */
 
 import { Hono } from 'hono';
+import { appOrigin } from '../env.js';
 import type { AppBindings } from '../session.js';
 import { Layout } from '../ui/layout.jsx';
 import { withUser } from '../session.js';
@@ -45,7 +46,13 @@ const FAQ = [
 faqRoutes.get('/faq', (c) => {
   const user = c.get('user');
   return c.html(
-    <Layout title="FAQ — social sindy" user={user}>
+    <Layout
+      title="FAQ — social sindy"
+      description="How social sindy works: what it reads from Buffer, the difference between the ICS calendar feed and the Atom/RSS content feed, how often feeds refresh, and how to keep a feed URL private."
+      canonical={`${appOrigin(c.env)}/faq`}
+      indexable
+      user={user}
+    >
       <h1>Frequently asked questions</h1>
       {FAQ.map((item, index) => (
         <div class="faq-item">

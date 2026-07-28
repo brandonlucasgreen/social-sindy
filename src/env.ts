@@ -1,3 +1,13 @@
+/**
+ * The public origin with any trailing slash removed, so callers can append a
+ * path without producing a double slash. Canonical URLs, the sitemap, and the
+ * OAuth redirects all have to agree byte-for-byte on the origin, and a stray
+ * trailing slash in the var would otherwise make them disagree.
+ */
+export function appOrigin(env: Pick<Env, 'APP_BASE_URL'>): string {
+  return env.APP_BASE_URL.replace(/\/$/, '');
+}
+
 export interface Env {
   DB: D1Database;
   /** Caches rendered feeds so client polls don't each spend Buffer quota. */
