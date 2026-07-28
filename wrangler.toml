@@ -1,4 +1,10 @@
-name = "social-cally"
+# Names the Worker this config deploys to. It is an identity, not a label: change
+# it and `wrangler deploy` targets a different Worker, taking the custom domains
+# below with it and leaving the old one orphaned. It must stay `social-sindy` to
+# match the D1 database, the package name, and the ICS UID domain. A Worker still
+# named social-cally exists in the account from before the rename; deploying to
+# it is what this line previously did.
+name = "social-sindy"
 main = "src/index.tsx"
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
