@@ -494,15 +494,54 @@ export interface LayoutProps {
   user?: { email: string } | null;
   /** Narrower measure for single-column task pages. */
   narrow?: boolean;
+  /**
+   * Whether search engines may index this page. Defaults to `false`, so a page
+   * is private unless it says otherwise — nearly every surface here is behind a
+   * session, and a new authed page must not become indexable by omission. Only
+   * the public marketing pages (`/`, `/faq`, `/privacy`) opt in.
+   */
+  indexable?: boolean;
+  /**
+   * SERP and link-preview snippet. Worth setting on any page that gets shared,
+   * indexable or not — Slack and LinkedIn read it regardless of `robots`.
+   */
+  description?: string;
+  /**
+   * Absolute canonical URL. Three hostnames serve this same HTML
+   * (socialsindy.com plus two legacy bgreen.lol domains kept alive for existing
+   * ICS subscribers), so an indexable page must name which one counts.
+   */
+  canonical?: string;
 }
 
-export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow, children }) => (
+export const Layout: FC<PropsWithChildren<LayoutProps>> = ({
+  title,
+  user,
+  narrow,
+  indexable,
+  description,
+  canonical,
+  children,
+}) => (
   <html lang="en">
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <meta name="robots" content="noindex" />
+      {indexable ? null : <meta name="robots" content="noindex" />}
       <title>{title}</title>
+      {description ? <meta name="description" content={description} /> : null}
+      {canonical ? <link rel="canonical" href={canonical} /> : null}
+      {/* Open Graph, so a shared link renders as a card rather than a bare URL.
+          No og:image yet — a 1200x630 card is still to be drawn, and pointing at
+          the 512px square mark would render a worse preview than none at all.
+          When that image lands, add og:image and switch twitter:card to
+          summary_large_image. */}
+      <meta property="og:type" content="website" />
+      <meta property="og:site_name" content="social sindy" />
+      <meta property="og:title" content={title} />
+      {description ? <meta property="og:description" content={description} /> : null}
+      {canonical ? <meta property="og:url" content={canonical} /> : null}
+      <meta name="twitter:card" content="summary" />
       <link rel="icon" href="/icon.svg" type="image/svg+xml" />
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
@@ -556,7 +595,7 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, user, narrow
       </div>
       <script dangerouslySetInnerHTML={{ __html: COPY_SCRIPT }} />
       <script
-        data-goatcounter="https://social-cally.goatcounter.com/count"
+        data-goatcounter="https://social-sindy.goatcounter.com/count"
         async
         src="//gc.zgo.at/count.js"
       />

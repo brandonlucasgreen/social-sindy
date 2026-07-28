@@ -9,6 +9,7 @@
 
 import { Hono } from 'hono';
 
+import { appOrigin } from '../env.js';
 import { Layout, Notice } from '../ui/layout.jsx';
 import type { AppBindings } from '../session.js';
 
@@ -22,7 +23,14 @@ const LAST_UPDATED = '26 July 2026';
 
 privacyRoutes.get('/privacy', (c) =>
   c.html(
-    <Layout title="Privacy policy — social sindy" user={c.get('user')} narrow>
+    <Layout
+      title="Privacy policy — social sindy"
+      description="What social sindy stores, why, for how long, and who else sees it. Read-only Buffer access, credentials encrypted at rest, no advertising, and account deletion that erases everything."
+      canonical={`${appOrigin(c.env)}/privacy`}
+      indexable
+      user={c.get('user')}
+      narrow
+    >
       <h1>Privacy policy</h1>
       <p class="lede">
         What social sindy stores, why, for how long, and who else sees it. Last updated{' '}

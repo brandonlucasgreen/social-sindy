@@ -20,7 +20,7 @@ import { csrf } from 'hono/csrf';
 import { HTTPException } from 'hono/http-exception';
 
 import { getOutputByToken, outputsDueForPush } from './db.js';
-import type { Env } from './env.js';
+import { appOrigin, type Env } from './env.js';
 import { respondWithFeed } from './feed.js';
 import { authRoutes } from './routes/auth.jsx';
 import { outputRoutes } from './routes/outputs.jsx';
@@ -79,6 +79,67 @@ app.get('/icon.svg', (c) =>
     'cache-control': 'public, max-age=86400',
   }),
 );
+
+/**
+ * The public marketing pages, and the only ones that belong in a sitemap. Every
+ * other surface is either behind a session or a machine endpoint, and each of
+ * these opts into indexing explicitly at its own `<Layout>`.
+ */
+const INDEXABLE_PATHS = ['/', '/faq', '/privacy'];
+
+/**
+ * Paths no crawler should spend budget on.
+ *
+ * `/feed` is deliberately absent. Some feed aggregators check robots.txt before
+ * fetching, so disallowing it risks breaking real Atom subscribers — and it
+ * would buy nothing, because feed tokens are unguessable and never linked, so a
+ * crawler has no way to reach one in the first place.
+ */
+const CRAWLER_DISALLOW = ['/sindies', '/auth', '/google', '/healthz'];
+
+/**
+ * robots.txt and the sitemap, above the session and CSRF middleware for the same
+ * reason as the favicon: public, cacheable, and not worth a cookie lookup.
+ *
+ * NOTE: Cloudflare also serves a managed robots.txt on this zone, which is what
+ * responded before this route existed. Verify after deploy that this one wins;
+ * if it does not, turn the managed robots.txt off in the dashboard.
+ */
+app.get('/robots.txt', (c) => {
+  const lines = [
+    'User-agent: *',
+    ...CRAWLER_DISALLOW.map((path) => `Disallow: ${path}`),
+    'Allow: /',
+    '',
+    `Sitemap: ${appOrigin(c.env)}/sitemap.xml`,
+    '',
+  ];
+
+  return c.body(lines.join('\n'), 200, {
+    'content-type': 'text/plain; charset=utf-8',
+    'cache-control': 'public, max-age=86400',
+  });
+});
+
+app.get('/sitemap.xml', (c) => {
+  const origin = appOrigin(c.env);
+  const urls = INDEXABLE_PATHS.map((path) => `  <url><loc>${origin}${path}</loc></url>`);
+
+  // No <lastmod>. These pages change when the code does, and a value invented at
+  // request time would be a lie a crawler learns to distrust.
+  const xml = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...urls,
+    '</urlset>',
+    '',
+  ].join('\n');
+
+  return c.body(xml, 200, {
+    'content-type': 'application/xml; charset=utf-8',
+    'cache-control': 'public, max-age=86400',
+  });
+});
 
 /**
  * Rejects cross-origin form posts. Feeds are read-only GETs, so this
