@@ -8,6 +8,16 @@ main = "src/index.tsx"
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Declared explicitly rather than left to default: this also gates Workers
+# Builds' PR preview URLs (preview_urls follows workers_dev unless set
+# separately), which need the *.workers.dev route to exist at all. It was
+# briefly disabled by hand in the dashboard and previews silently stopped
+# working with no comment on the PR and no error anywhere — a dashboard-only
+# toggle with nothing backing it in code can drift again the same way. If
+# this Worker should ever go back to custom-domains-only with no public
+# workers.dev URL, flip this to `false` here, not just in the dashboard.
+workers_dev = true
+
 # Custom Domains: the merged product lives at socialsindy.com.
 [[routes]]
 pattern = "socialsindy.com"
