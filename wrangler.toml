@@ -1,4 +1,4 @@
-name = "social-sindy"
+name = "social-cally"
 main = "src/index.tsx"
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
