@@ -545,10 +545,26 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({
       <link rel="icon" href="/icon.svg" type="image/svg+xml" />
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=SN+Pro:wght@400;500;600;700&display=swap"
+      {/* Loaded via script rather than a plain <link rel="stylesheet">: that tag
+          blocks first paint on a round trip to fonts.googleapis.com and then
+          fonts.gstatic.com before any text can render, which measured as ~1s of
+          the homepage's LCP. The system font stack in `body` above paints
+          immediately and SN Pro swaps in once it arrives — no layout shift
+          since `font-display: swap` is already part of the requested URL. The
+          <noscript> tag keeps the old blocking behaviour as a fallback for the
+          rare visitor without JS, which is strictly no worse than today. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html:
+            "(function(){var l=document.createElement('link');l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family=SN+Pro:wght@400;500;600;700&display=swap';document.head.appendChild(l);})();",
+        }}
       />
+      <noscript>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=SN+Pro:wght@400;500;600;700&display=swap"
+        />
+      </noscript>
       <style dangerouslySetInnerHTML={{ __html: STYLES }} />
     </head>
     <body>
@@ -589,6 +605,10 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({
             &middot;{' '}
             <a href="/privacy" target="_blank" rel="noopener noreferrer">
               Privacy policy
+            </a>{' '}
+            &middot;{' '}
+            <a href="/terms" target="_blank" rel="noopener noreferrer">
+              Terms of service
             </a>
           </p>
         </footer>
