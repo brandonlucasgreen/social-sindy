@@ -14,6 +14,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only, and declared at the top level so no job can silently inherit more.
+# This workflow only needs to check out the code and run two commands; nothing
+# here writes to the repository. Note also that the trigger above is
+# `pull_request`, not `pull_request_target` — a pull request from a fork runs the
+# fork's code with no access to repository secrets. Do not switch to
+# `pull_request_target` to "fix" a fork-related failure: that combination runs
+# untrusted code with a privileged token, and there are no secrets to be gained
+# by it here anyway.
 permissions:
   contents: read
 
@@ -22,17 +30,32 @@ jobs:
     name: check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      # Actions are pinned to commit SHAs rather than tags. A tag like `v5` is a
+      # moving pointer the action's owner can repoint at any commit, so trusting
+      # it is trusting that account not to be compromised. The comment records
+      # which release each SHA was, and Dependabot advances them.
+      #
+      # persist-credentials: false keeps the job's token out of .git/config,
+      # where any later step — including a dependency's build script — could
+      # read it back out.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
       # Reads the version from package.json's `packageManager` field, and caches
       # the pnpm store keyed on the lockfile.
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
           cache: pnpm
 
+      # --frozen-lockfile makes the install fail rather than silently resolve a
+      # dependency the lockfile does not already pin. Combined with pnpm 10's
+      # default of not running dependency lifecycle scripts (see
+      # `onlyBuiltDependencies` in package.json), a pull request cannot pull in
+      # an unreviewed package and have it execute during install.
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm typecheck

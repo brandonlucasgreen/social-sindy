@@ -1,0 +1,23 @@
+# Every path is owned by the maintainer, so any pull request automatically
+# requests his review. On its own this file is a routing convenience, not a
+# control — it only becomes enforcement if the ruleset on `main` requires review
+# from code owners.
+#
+# Deliberately do NOT turn on "require review from Code Owners" while this is a
+# one-person project: GitHub never counts the pull request author as a reviewer,
+# so the sole code owner would be unable to satisfy his own requirement and
+# could not merge anything.
+*                       @brandonlucasgreen
+
+# Paths where a change is security-relevant even when it looks routine. Called
+# out so the diff gets read with that in mind rather than skimmed.
+/src/crypto.ts          @brandonlucasgreen
+/src/session.ts         @brandonlucasgreen
+/src/buffer/oauth.ts    @brandonlucasgreen
+/src/buffer/token.ts    @brandonlucasgreen
+/src/google/oauth.ts    @brandonlucasgreen
+/src/index.tsx          @brandonlucasgreen
+/wrangler.toml          @brandonlucasgreen
+/.github/               @brandonlucasgreen
+/package.json           @brandonlucasgreen
+/pnpm-lock.yaml         @brandonlucasgreen

@@ -1,0 +1,33 @@
+# Dependency updates. Grouped into one PR per ecosystem per week, because this is
+# a small dependency tree maintained by one person and a stream of single-package
+# PRs is noise rather than signal.
+#
+# Security updates are NOT governed by the schedule below — Dependabot opens
+# those as soon as an advisory lands, provided Dependabot alerts are enabled in
+# the repository's Settings → Advanced Security.
+version: 2
+
+updates:
+  # The Worker's own dependencies.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      production:
+        applies-to: version-updates
+        dependency-type: production
+      development:
+        applies-to: version-updates
+        dependency-type: development
+
+  # The CI workflow's actions. Without this, pinned action SHAs would never be
+  # advanced and would quietly rot.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
