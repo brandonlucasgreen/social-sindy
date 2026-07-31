@@ -107,6 +107,18 @@ describe('security headers', () => {
     expect(csp).toContain("frame-ancestors 'none'");
   });
 
+  it('keeps img-src same-origin, since channel avatars go through /avatar', async () => {
+    // Buffer returns avatar URLs on an open-ended set of third-party CDNs, and
+    // the tempting "fix" when they render broken is to add those hosts here.
+    // Don't: the host set is unbounded (any Mastodon instance qualifies), and
+    // src/avatar.ts proxies them through this origin precisely so this policy
+    // can stay closed. Widening it would also hand every visitor's IP to a
+    // dozen social networks on page load.
+    const response = await fetch(`${ORIGIN}/faq`, { 'cf-visitor': '{"scheme":"https"}' });
+    const csp = response.headers.get('content-security-policy') ?? '';
+    expect(csp).toContain("img-src 'self' data:");
+  });
+
   it('still sets security headers on a redirect response, not only on a terminal 200', async () => {
     // Guards the registration order: secureHeaders() must run even when a
     // later middleware short-circuits with a redirect instead of calling

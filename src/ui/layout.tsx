@@ -289,16 +289,49 @@ button[disabled], .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform
   width: 1.125rem; height: 1.125rem; margin: 0; flex: none;
   accent-color: var(--link);
 }
+/* The avatar is a disc that is *always* the network-coloured initial, with the
+   photo layered over it when there is one. An avatar that is missing, expired
+   (LinkedIn signs its URLs with an expiry), or refused by the upstream CDN
+   therefore lands on a deliberate mark — and because the initial is painted
+   underneath rather than swapped in, a slow photo has nothing to shift when it
+   arrives.
+
+   The photo is a background-image on .photo, not an <img>, and that is the
+   whole trick: a background-image that fails to load renders *nothing at all*,
+   where a broken <img> renders the browser's broken-image glyph on top of the
+   disc. An <img> would need JavaScript to remove it on error, which means the
+   fallback would silently stop working wherever script does not run. This
+   version needs no script at all. */
 .channel .avatar {
+  position: relative; isolation: isolate;
   width: 1.75rem; height: 1.75rem; border-radius: 50%; flex: none;
-  object-fit: cover; background: var(--sunken);
+  display: grid; place-items: center; overflow: hidden;
+  background: var(--net, var(--border));
 }
-/* Buffer does not always return an avatar. Rather than an empty gray blob, fall
-   back to the channel's initial on its network's own tint. */
-.channel .avatar.fallback {
-  display: grid; place-items: center;
-  background: color-mix(in oklab, var(--net, var(--border)) 22%, var(--raised));
-  color: var(--text); font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+/* A hairline ring, above the photo rather than an inset shadow beneath it:
+   several networks are black or near-black and would otherwise dissolve into
+   the dark ground, and a photo with pale edges needs the same containment. */
+.channel .avatar::after {
+  content: ''; position: absolute; inset: 0; z-index: 2;
+  border-radius: 50%; pointer-events: none;
+  box-shadow: inset 0 0 0 0.0625rem hsl(0 0% 100% / 0.16), inset 0 0 0 0.0625rem hsl(0 0% 0% / 0.06);
+}
+.channel .avatar::before {
+  content: attr(data-initial);
+  color: hsl(0 0% 100%);
+  font-size: 0.75rem; font-weight: 600; line-height: 1;
+  /* Brand colours run from near-black to mid-tone blues, so white text is not
+     uniformly high-contrast on its own. A tight shadow anchors it on the
+     lighter end without muddying the brand colour itself. */
+  text-shadow: 0 0.03125rem 0.0625rem hsl(0 0% 0% / 0.35);
+}
+/* z-index 1: above the initial in ::before, below the ring in ::after. With no
+   --photo set the var() falls back to none, leaving the initial uncovered.
+   (No backticks in this block: STYLES is a template literal.) */
+.channel .avatar .photo {
+  position: absolute; inset: 0; z-index: 1;
+  background-image: var(--photo, none);
+  background-size: cover; background-position: center; background-repeat: no-repeat;
 }
 .channel .meta { min-width: 0; }
 .channel .meta strong { display: block; font-weight: 500; font-size: 0.9375rem; }
