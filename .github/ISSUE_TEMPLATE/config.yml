@@ -1,0 +1,16 @@
+# Adds a third entry to the "New issue" chooser, alongside bug_report and
+# feature_request, for people who do not have a GitHub account.
+#
+# Filing a GitHub issue — or a Discussion — requires an account, and GitHub
+# offers no anonymous path. So the only way to accept a report from someone
+# without an account is to route them off GitHub; this points them at email and
+# the maintainer files the issue on their behalf.
+#
+# `blank_issues_enabled: false` keeps the chooser as the only route in, so this
+# link is actually seen rather than bypassed by the "open a blank issue" escape
+# hatch directly beneath it.
+blank_issues_enabled: false
+contact_links:
+  - name: Report a bug without a GitHub account
+    url: mailto:hi@bgreen.lol?subject=social%20sindy%20bug%20report
+    about: No GitHub account needed — email the details and I'll file it for you.
