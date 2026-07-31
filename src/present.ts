@@ -103,6 +103,21 @@ export function serviceEmoji(service: string): string {
   return SERVICE_EMOJI[service] ?? '📅';
 }
 
+/**
+ * The single character that stands in for a channel with no usable avatar.
+ *
+ * Skips leading punctuation so an `@handle` or a `#tag` yields its first real
+ * letter rather than a sigil every channel would share. `Array.from` rather
+ * than indexing, so an emoji or a non-BMP script is taken as one character
+ * instead of half a surrogate pair.
+ */
+export function channelInitial(name: string): string {
+  for (const character of Array.from(name.trim())) {
+    if (/[\p{L}\p{N}]/u.test(character)) return character.toLocaleUpperCase();
+  }
+  return '?';
+}
+
 /** XML-escape text content. */
 export function escapeXml(text: string): string {
   return text

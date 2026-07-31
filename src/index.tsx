@@ -20,6 +20,7 @@ import { csrf } from 'hono/csrf';
 import { HTTPException } from 'hono/http-exception';
 import { secureHeaders } from 'hono/secure-headers';
 
+import { fetchAvatar, verifiedAvatarTarget } from './avatar.js';
 import { getOutputByToken, outputsDueForPush } from './db.js';
 import { appOrigin, type Env } from './env.js';
 import { respondWithFeed } from './feed.js';
@@ -192,6 +193,38 @@ app.get('/icon.svg', (c) =>
     'cache-control': 'public, max-age=86400',
   }),
 );
+
+/**
+ * Channel avatars, proxied so they can be served from this origin under the
+ * app's `img-src 'self'` policy. See `src/avatar.ts` for why that indirection
+ * is needed at all.
+ *
+ * Above the session and CSRF middleware for the same reason as the favicon:
+ * these are images a browser fetches as page subresources. The HMAC in the
+ * query string is what authorizes the fetch, not a cookie — nothing here is
+ * user-specific, and an avatar is a public image on a public CDN either way.
+ *
+ * Responses are held in Cloudflare's own cache keyed on the signed URL, so a
+ * user reloading the picker with a dozen channels does not re-fetch a dozen
+ * third-party CDNs on every render.
+ */
+app.get('/avatar', async (c) => {
+  const url = new URL(c.req.url);
+  const upstream = await verifiedAvatarTarget(c.env, url.searchParams);
+  if (!upstream) return c.notFound();
+
+  const cache = caches.default;
+  const cacheKey = new Request(url.toString(), { method: 'GET' });
+
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
+
+  const response = await fetchAvatar(upstream);
+  if (response.status === 200) {
+    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
+  }
+  return response;
+});
 
 /**
  * The public marketing pages, and the only ones that belong in a sitemap. Every

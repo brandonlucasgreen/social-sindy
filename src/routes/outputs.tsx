@@ -21,7 +21,9 @@ import {
   type OutputFormat,
   type OutputWithChannels,
 } from '../db.js';
-import { serviceColor, serviceLabel } from '../present.js';
+import { avatarCssValue, proxiedAvatarUrl } from '../avatar.js';
+import type { Env } from '../env.js';
+import { channelInitial, serviceColor, serviceLabel } from '../present.js';
 import { Layout, Notice, Steps } from '../ui/layout.jsx';
 import {
   accountFor,
@@ -200,7 +202,52 @@ const Select: FC<{
   </div>
 );
 
-const ChannelPicker: FC<{ channels: BufferChannel[]; selected: Set<string> }> = ({
+/**
+ * A channel plus the same-origin URL its avatar is reachable at, resolved by
+ * `withProxiedAvatars` before render because signing is async and a hono/jsx
+ * component is not.
+ */
+type PickerChannel = BufferChannel & { avatarUrl: string | null };
+
+/**
+ * Signs each channel's avatar URL for the proxy. See `src/avatar.ts` — the raw
+ * Buffer URLs point at third-party CDNs the CSP does not allow, so they cannot
+ * be rendered directly.
+ */
+async function withProxiedAvatars(
+  env: Pick<Env, 'ENCRYPTION_KEY'>,
+  channels: BufferChannel[],
+): Promise<PickerChannel[]> {
+  return Promise.all(
+    channels.map(async (channel) => ({
+      ...channel,
+      avatarUrl: await proxiedAvatarUrl(env, channel.avatar),
+    })),
+  );
+}
+
+/**
+ * The avatar disc: the channel's initial on its network's brand colour, with
+ * the photo laid over it when there is one.
+ *
+ * The photo is a `background-image` rather than an `<img>` on purpose — a
+ * background-image that fails to load renders nothing, so a channel whose
+ * avatar 404s, expires (LinkedIn's URLs carry an `e=` expiry), or is simply
+ * missing falls back to the initial with no broken-image glyph and no
+ * JavaScript involved. See the `.channel .avatar` rules in ui/layout.tsx.
+ */
+const Avatar: FC<{ channel: PickerChannel; name: string }> = ({ channel, name }) => (
+  <span
+    class="avatar"
+    aria-hidden="true"
+    data-initial={channelInitial(name)}
+    style={channel.avatarUrl ? `--photo:${avatarCssValue(channel.avatarUrl)}` : undefined}
+  >
+    <span class="photo" />
+  </span>
+);
+
+const ChannelPicker: FC<{ channels: PickerChannel[]; selected: Set<string> }> = ({
   channels,
   selected,
 }) => (
@@ -216,13 +263,7 @@ const ChannelPicker: FC<{ channels: BufferChannel[]; selected: Set<string> }> = 
           value={channel.id}
           checked={selected.has(channel.id)}
         />
-        {channel.avatar ? (
-          <img class="avatar" src={channel.avatar} alt="" loading="lazy" />
-        ) : (
-          <span class="avatar fallback" aria-hidden="true">
-            {Array.from(name)[0] ?? '?'}
-          </span>
-        )}
+        <Avatar channel={channel} name={name} />
         <span class="meta">
           <strong>{name}</strong>
           <small>
@@ -537,7 +578,10 @@ outputRoutes.get('/sindies/new', async (c) => {
     const organization = account.organizations.find((org) => org.id === organizationId);
     if (!organization) return c.redirect('/sindies/new', 302);
 
-    const channels = await channelsFor(c.env, user.id, organizationId);
+    const channels = await withProxiedAvatars(
+      c.env,
+      await channelsFor(c.env, user.id, organizationId),
+    );
     const settings: SindySettings = {
       name: `Buffer — ${organization.name}`,
       channelIds: [],
@@ -781,7 +825,10 @@ outputRoutes.get('/sindies/:id/edit', async (c) => {
   if (!output) return c.notFound();
 
   try {
-    const channels = await channelsFor(c.env, user.id, output.organization_id);
+    const channels = await withProxiedAvatars(
+      c.env,
+      await channelsFor(c.env, user.id, output.organization_id),
+    );
     const settings: SindySettings = {
       name: output.name,
       channelIds: output.channels.map((ch) => ch.channel_id),
