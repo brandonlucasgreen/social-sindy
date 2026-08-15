@@ -102,7 +102,7 @@ describe('security headers', () => {
 
     const csp = response.headers.get('content-security-policy');
     expect(csp).toContain("default-src 'self'");
-    expect(csp).toContain('https://fonts.googleapis.com');
+    expect(csp).toContain('https://api.fonts.coollabs.io');
     expect(csp).toContain('https://gc.zgo.at');
     expect(csp).toContain("frame-ancestors 'none'");
   });

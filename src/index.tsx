@@ -83,8 +83,8 @@ app.use(
       frameAncestors: ["'none'"],
       objectSrc: ["'none'"],
       scriptSrc: ["'self'", "'unsafe-inline'", 'https://gc.zgo.at', 'https://static.cloudflareinsights.com'],
-      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://api.fonts.coollabs.io'],
+      fontSrc: ["'self'", 'https://cdn.fonts.coollabs.io'],
       imgSrc: ["'self'", 'data:'],
       connectSrc: [
         "'self'",
