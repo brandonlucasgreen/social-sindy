@@ -26,6 +26,10 @@ const FAQ = [
     a: `ICS is for calendars — each post becomes a timed event with a start time and duration. Atom is for feeds — each post becomes an entry with the full text and links, readable in any RSS app or email tool. You can create both from the same Buffer connection.`,
   },
   {
+    q: 'Can I show my posts on my own website?',
+    a: `Yes — create a widget sindy. You pick the channels, how many posts to show, and how it looks (colors, font, size, dimensions), then paste the embed code into your site or link-in-bio page. Widgets only ever show published posts, since the embed code is meant to be public.`,
+  },
+  {
     q: 'How often does it refresh?',
     a: `You pick the interval when you create a sindy — every hour, every 6 hours, or once a day. Calendar apps and RSS readers also have their own refresh schedules, so updates may take a bit longer to appear depending on the app.`,
   },

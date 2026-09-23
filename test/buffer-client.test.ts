@@ -173,6 +173,37 @@ describe('BufferClient', () => {
     expect(body.variables.input.sort).toEqual([{ field: 'dueAt', direction: 'asc' }]);
   });
 
+  it('sorts newest first and stops paging at the limit when asked', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        data: {
+          posts: {
+            edges: [{ node: { id: 'p1' } }, { node: { id: 'p2' } }, { node: { id: 'p3' } }],
+            pageInfo: { hasNextPage: true, endCursor: 'more' },
+          },
+        },
+      }),
+    );
+
+    const result = await new BufferClient('k', fetchImpl as unknown as typeof fetch).fetchPosts({
+      organizationId: 'org_1',
+      channelIds: ['ch_a'],
+      statuses: ['sent'],
+      start: new Date('2025-10-01T00:00:00.000Z'),
+      end: new Date('2026-10-01T00:00:00.000Z'),
+      direction: 'desc',
+      limit: 3,
+    });
+
+    // One request, not ten: a "latest 3" widget must not page a whole year.
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.variables.input.sort).toEqual([{ field: 'dueAt', direction: 'desc' }]);
+    expect(body.variables.first).toBe(3);
+    expect(result.posts).toHaveLength(3);
+  });
+
   it('follows pagination cursors and accumulates every page', async () => {
     let call = 0;
     const fetchImpl = vi.fn(async () => {

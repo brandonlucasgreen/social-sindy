@@ -159,6 +159,14 @@ export interface FetchPostsParams {
   start: Date;
   /** Inclusive end of the dueAt window. */
   end: Date;
+  /** Defaults to 'asc'. The widget asks for newest first. */
+  direction?: 'asc' | 'desc';
+  /**
+   * Stop paging once this many posts are in hand. Only meaningful with a sort
+   * that puts the wanted posts first, and it is what keeps a "latest 5" widget
+   * at one Buffer request per refresh instead of paging a whole window.
+   */
+  limit?: number;
 }
 
 export interface FetchPostsResult {
@@ -277,8 +285,9 @@ export class BufferClient {
         status: params.statuses,
         dueAt: { start: params.start.toISOString(), end: params.end.toISOString() },
       },
-      sort: [{ field: 'dueAt', direction: 'asc' }],
+      sort: [{ field: 'dueAt', direction: params.direction ?? 'asc' }],
     };
+    const limit = params.limit && params.limit > 0 ? params.limit : null;
 
     const posts: BufferPost[] = [];
     let rateLimit: RateLimitWindow[] = [];
@@ -290,7 +299,7 @@ export class BufferClient {
       // below, and inference would treat that as a circular reference.
       const result: RequestResult<PostsPage> = await this.request<PostsPage>(
         POSTS_QUERY,
-        { input, first: PAGE_SIZE, after },
+        { input, first: limit ? Math.min(PAGE_SIZE, limit - posts.length) : PAGE_SIZE, after },
         'FeedPosts',
       );
 
@@ -298,6 +307,7 @@ export class BufferClient {
       for (const edge of result.data.posts.edges ?? []) posts.push(edge.node);
 
       const { hasNextPage, endCursor } = result.data.posts.pageInfo;
+      if (limit && posts.length >= limit) break;
       if (!hasNextPage || !endCursor) break;
       after = endCursor;
 

@@ -6,25 +6,31 @@ Live at **[socialsindy.com](https://socialsindy.com)**. Not affiliated with Buff
 
 ## What it does
 
-Sign in with Buffer once, then create **sindies**. Each sindy is one feed, in one of two formats:
+Sign in with Buffer once, then create **sindies**. Each sindy is one output, in one of three formats:
 
 - **Calendar feed (ICS)** — subscribe in Google Calendar, Apple Calendar, or Outlook. Each scheduled or published post becomes a timed event, colored by network.
 - **Content feed (Atom/RSS)** — subscribe in any RSS reader, or pipe it into an email tool. Each post becomes an entry with full text, channel metadata, and media attachments.
+- **Embeddable widget** — paste an `<iframe>` into a website or link-in-bio page. Shows your latest published posts as cards, styled to match the host site. Unlike the other two, its URL is public by design, so it only ever carries published posts.
 
-Every sindy has its own channel selection, date window, refresh interval, and private share URL. One Buffer connection can produce as many of both as you want.
+Every sindy has its own channel selection, refresh interval, and share URL. One Buffer connection can produce as many of each as you want.
 
 ### Per-sindy settings
 
 | Setting | Options | Applies to |
 |---------|---------|------------|
-| Refresh interval | hourly, every 6 hours, daily | both |
-| Past window | upcoming only, 7 / 30 / 90 days | both |
-| Future window | configurable day count | both |
-| Post statuses | scheduled, sent | both |
+| Refresh interval | hourly, every 6 hours, daily | all |
+| Past window | upcoming only, 7 / 30 / 90 days | ICS |
+| Future window | configurable day count | ICS |
+| Post statuses | scheduled, sent, drafts, … | ICS (Atom: sent ± drafts; widget: sent only) |
 | Event duration | 15 / 30 / 60 minutes | ICS |
 | Channel name in title | on/off | ICS |
 | Max items | default 50 | Atom |
-| Group cross-posts into one entry | on/off | Atom |
+| Group cross-posts into one entry | on/off | Atom, widget |
+| Posts to show | 3 / 5 / 10 / 20 / 50 | widget |
+| Color scheme, accent color | auto / light / dark, any hex | widget |
+| Font, font size, corners | curated list, 13–20px, 3 radii | widget |
+| Max width, height | px (width 0 = fill container) | widget |
+| Title, channel, images, transparent background | on/off each | widget |
 
 The share URL can be regenerated at any time, which immediately invalidates the old one.
 
@@ -113,12 +119,13 @@ src/
   buffer/              — GraphQL client, OAuth (PKCE), token rotation
   ics/                 — ICS generation (RFC 5545) and serialization
   atom/                — Atom generation (RFC 4287)
+  widget/              — embeddable widget: HTML renderer, validated style options
   google/              — Calendar API client, OAuth
   sync/                — posts fetcher, Google push, reconciliation, push config
   routes/              — auth (landing + OAuth), outputs (sindy management), faq,
                          google (push), privacy
   ui/                  — layout and styles, brand mark
-migrations/            — 0001_init → 0004_unified_outputs
+migrations/            — 0001_init → 0005_widget
 test/                  — crypto, ICS round-trip, Atom, feed cache, Buffer client
                          + OAuth, auth callback, reconciliation, indexability
 ```
@@ -134,9 +141,12 @@ test/                  — crypto, ICS round-trip, Atom, feed cache, Buffer clie
 | `/faq`, `/privacy` | public | FAQ and privacy policy |
 | `/feed/:token.ics` | token | the ICS feed calendar clients poll |
 | `/feed/:token.xml` | token | the Atom feed RSS readers poll |
+| `/embed/:token` | token | the widget page websites frame; its own frameable, script-free CSP |
 | `/healthz`, `/icon.svg` | public | health check, favicon |
 
-Feed routes are registered ahead of the session and CSRF middleware on purpose: calendar clients and RSS readers send no cookies and no `Origin` header, and those routes must stay plain, cheap GETs.
+Feed routes are registered ahead of the session and CSRF middleware on purpose: calendar clients and RSS readers send no cookies and no `Origin` header, and those routes must stay plain, cheap GETs. `/embed` sits there too, and answers only for widget outputs — an ICS or Atom token (which can carry scheduled posts and drafts) never renders under its frameable headers, and a widget token never answers under `/feed`.
+
+A widget costs at most one Buffer request per refresh interval regardless of site traffic: the query sorts newest-first and stops at the card count, and the rendered page is served from the same KV cache as the feeds. Cache hits do not write to D1, since that would scale with someone else's page views.
 
 ### Domains
 

@@ -1,5 +1,5 @@
 /**
- * The public feed endpoint — handles both ICS and Atom outputs.
+ * The public feed endpoint — handles ICS, Atom, and embeddable-widget outputs.
  *
  * Unauthenticated by necessity: Google, Apple, Outlook, and RSS readers fetch
  * subscribed feeds without the ability to send a credential, so the feed token
@@ -19,6 +19,8 @@ import type { Env } from './env.js';
 import { generateIcs, type ChannelRef } from './ics/generate.js';
 import { generateAtom } from './atom/generate.js';
 import { postsForOutput } from './sync/posts.js';
+import { generateWidget, POST_MARKER } from './widget/generate.js';
+import { parseWidgetStyle } from './widget/style.js';
 
 /** How long a successful render is kept as the fallback for a failed refresh. */
 const LAST_GOOD_TTL_SECONDS = 7 * 86_400;
@@ -54,13 +56,26 @@ function channelRefs(output: OutputWithChannels): Map<string, ChannelRef> {
   );
 }
 
-/** Renders the feed for this output, dispatching to ICS or Atom based on format. */
+const RENDERERS = {
+  ics: renderIcs,
+  atom: renderAtom,
+  widget: renderWidget,
+} as const;
+
+/** Counts what a render contains, for the dashboard's status line. */
+function itemCount(output: OutputWithChannels, body: string): number {
+  const marker =
+    output.format === 'ics' ? 'BEGIN:VEVENT' : output.format === 'atom' ? '<entry>' : POST_MARKER;
+  return body.split(marker).length - 1;
+}
+
+/** Renders the feed for this output, dispatching on its format. */
 export function buildFeed(
   env: Env,
   output: OutputWithChannels,
   now: Date = new Date(),
 ): Promise<FeedResult> {
-  const renderer = output.format === 'atom' ? renderAtom : renderIcs;
+  const renderer = RENDERERS[output.format] ?? renderIcs;
   return cachedFeed(env, output, () => renderer(env, output, now));
 }
 
@@ -90,13 +105,7 @@ export async function cachedFeed(
       env.FEED_CACHE.put(lastGoodKey(output), body, { expirationTtl: LAST_GOOD_TTL_SECONDS }),
     ]);
 
-    // Count events/items depending on format
-    const eventCount =
-      output.format === 'ics'
-        ? (body.match(/BEGIN:VEVENT/g) ?? []).length
-        : (body.match(/<entry>/g) ?? []).length;
-
-    return { body, cached: false, stale: false, eventCount };
+    return { body, cached: false, stale: false, eventCount: itemCount(output, body) };
   } catch (error) {
     // A transient Buffer failure must not make a subscribed feed go empty,
     // which clients would render as every event having been deleted.
@@ -165,6 +174,23 @@ async function renderAtom(
   }, now);
 }
 
+async function renderWidget(
+  env: Env,
+  output: OutputWithChannels,
+  now: Date,
+): Promise<string> {
+  const { bundle } = await postsForOutput(env, output, now);
+
+  return generateWidget(bundle.posts, channelRefs(output), {
+    name: output.name,
+    style: parseWidgetStyle(output.widget_style),
+    groupCrossPosts: output.group_cross_posts === 1,
+    maxCards: output.max_items,
+    timezone: output.user_timezone ?? 'UTC',
+    appUrl: env.APP_BASE_URL,
+  });
+}
+
 /** Weak validator over the rendered body, so unchanged feeds can 304. */
 export async function etagFor(body: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body) as BufferSource);
@@ -174,6 +200,12 @@ export async function etagFor(body: string): Promise<string> {
     .join('');
   return `W/"${hex}"`;
 }
+
+const CONTENT_TYPES = {
+  ics: 'text/calendar; charset=utf-8',
+  atom: 'application/atom+xml; charset=utf-8',
+  widget: 'text/html; charset=utf-8',
+} as const;
 
 export interface FeedResponseOptions {
   /** Records the poll without adding latency to the response. */
@@ -196,7 +228,14 @@ export async function respondWithFeed(
     // 401 would tell a client to prompt for credentials it cannot
     // supply; 503 with Retry-After is the signal to try again later.
     const retryAfter = error instanceof BufferRateLimitError ? error.retryAfterSeconds : null;
-    return new Response(`Could not build this feed: ${message}\n`, {
+    // A widget's visitors are strangers on someone else's website: they get a
+    // neutral line, not the owner's Buffer error. The owner sees the real
+    // message on their dashboard, via recordPoll above.
+    const body =
+      output.format === 'widget'
+        ? 'These posts could not be loaded right now.\n'
+        : `Could not build this feed: ${message}\n`;
+    return new Response(body, {
       status: 503,
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
@@ -205,18 +244,24 @@ export async function respondWithFeed(
     });
   }
 
-  options.waitUntil?.(
-    recordPoll(env.DB, output.id, {
-      fetched: !result.cached,
-      eventCount: result.eventCount ?? undefined,
-      error: null,
-    }),
-  );
+  // A widget is loaded on every view of the page it is embedded in, so a D1
+  // write per cache hit would scale with someone else's traffic. Only real
+  // refreshes are recorded for it; subscription feeds still record every poll,
+  // which is what "last polled by a client" on the dashboard reports.
+  if (!result.cached || output.format !== 'widget') {
+    options.waitUntil?.(
+      recordPoll(env.DB, output.id, {
+        fetched: !result.cached,
+        eventCount: result.eventCount ?? undefined,
+        error: null,
+      }),
+    );
+  }
 
   const isIcs = output.format === 'ics';
   const etag = await etagFor(result.body);
   const headers: Record<string, string> = {
-    'Content-Type': isIcs ? 'text/calendar; charset=utf-8' : 'application/atom+xml; charset=utf-8',
+    'Content-Type': CONTENT_TYPES[output.format] ?? CONTENT_TYPES.ics,
     'Cache-Control': `public, max-age=${Math.max(60, output.refresh_minutes * 60)}`,
     ETag: etag,
     // The feed is a private URL; keep it out of search engines and referrers.

@@ -374,6 +374,27 @@ button[disabled], .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform
   .url code { white-space: normal; word-break: break-all; }
 }
 
+/* --- widget embed ------------------------------------------------------- */
+
+input[type=color] {
+  width: 3.25rem; height: 2.5rem; padding: 0.25rem; cursor: pointer;
+  background: var(--sunken); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.snippet {
+  background: var(--sunken); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: 0.875rem 1rem; margin-bottom: 0.875rem;
+}
+.snippet code {
+  display: block; font-size: 0.8125rem; line-height: 1.5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap; word-break: break-all;
+}
+.snippet button { margin-top: 0.75rem; padding: 0.5rem 1rem; font-size: 0.8125rem; }
+.preview {
+  display: block; margin: 0 auto; border: 1px dashed var(--border);
+  border-radius: var(--radius-sm); max-width: 100%;
+}
+
 /* --- calendar list ------------------------------------------------------ */
 
 .cal {

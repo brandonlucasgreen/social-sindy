@@ -25,6 +25,7 @@ People who publish through Buffer and want their schedule and publishing history
 
 - **ICS** — iCalendar (RFC 5545). Subscribable by Google Calendar, Apple Calendar, Outlook, and any calendar client that supports subscription URLs. Each post becomes a calendar event at its scheduled or sent time.
 - **Atom** — Atom Syndication Format (RFC 4287). Subscribable by any RSS reader. Each post becomes a feed entry with full text, channel metadata, and media attachments. Cross-posts can be grouped into a single entry.
+- **Widget** — a static, script-free HTML page embedded via `<iframe>` on a creator's website or link-in-bio. Shows the latest N published posts as cards; color scheme, accent, font, size, corners, dimensions, and which details appear are all configurable. Its URL is public by design, so it only ever includes published posts and never links into Buffer.
 
 ## Optional Google Calendar push
 

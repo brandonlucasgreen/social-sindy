@@ -1,8 +1,9 @@
 /**
- * Creating, viewing, and managing sindies (ICS or Atom feeds).
+ * Creating, viewing, and managing sindies (ICS feeds, Atom feeds, or
+ * embeddable widgets).
  *
  * Replaces the old calendars.tsx and feeds.tsx with a unified management UI
- * where the user picks a format (ICS or Atom) when creating a sindy.
+ * where the user picks a format when creating a sindy.
  */
 
 import { Hono } from 'hono';
@@ -14,6 +15,7 @@ import {
   createOutput,
   deleteOutput,
   getOutput,
+  isOutputFormat,
   listOutputs,
   parseStatuses,
   rotateFeedToken,
@@ -25,6 +27,24 @@ import { avatarCssValue, proxiedAvatarUrl } from '../avatar.js';
 import type { Env } from '../env.js';
 import { channelInitial, serviceColor, serviceLabel } from '../present.js';
 import { Layout, Notice, Steps } from '../ui/layout.jsx';
+import {
+  DEFAULT_WIDGET_POST_COUNT,
+  DEFAULT_WIDGET_STYLE,
+  HEIGHT_MAX,
+  HEIGHT_MIN,
+  WIDGET_FONTS,
+  WIDGET_FONT_SIZES,
+  WIDGET_POST_COUNTS,
+  WIDGET_RADII,
+  WIDGET_THEMES,
+  WIDTH_MAX,
+  embedSnippet,
+  embedUrl,
+  normalizeWidgetStyle,
+  parseWidgetStyle,
+  serializeWidgetStyle,
+  type WidgetStyle,
+} from '../widget/style.js';
 import {
   accountFor,
   channelsFor,
@@ -100,6 +120,23 @@ function pickNumber(value: string, allowed: readonly number[], fallback: number)
   return allowed.includes(parsed) ? parsed : fallback;
 }
 
+function parseFormat(value: string | undefined): OutputFormat {
+  return value && isOutputFormat(value) ? value : 'ics';
+}
+
+function checked(body: ParsedBody, name: string): boolean {
+  return toStrings(body[name]).length > 0;
+}
+
+/**
+ * A widget's URL is pasted into a public website, so it only ever shows what is
+ * already public: published posts. Scheduled posts and drafts are never
+ * offered. The window reaches a year back because the Buffer query is sorted
+ * newest-first and capped at the card count, so a wide window costs nothing.
+ */
+const WIDGET_STATUSES: PostStatus[] = ['sent'];
+const WIDGET_PAST_DAYS = 365;
+
 interface SindySettings {
   name: string;
   channelIds: string[];
@@ -113,10 +150,45 @@ interface SindySettings {
   windowPastDays: number;
   windowFutureDays: number;
   statuses: PostStatus[];
+  widgetStyle: WidgetStyle;
 }
 
 function readSettings(body: ParsedBody, fallbackName: string, format: OutputFormat): SindySettings {
   const channelIds = toStrings(body['channelIds']);
+
+  if (format === 'widget') {
+    return {
+      name: toString(body['name']).trim().slice(0, 120) || fallbackName,
+      channelIds,
+      format,
+      eventDurationMinutes: 15,
+      showChannelInTitle: true,
+      maxItems: pickNumber(toString(body['maxItems']), WIDGET_POST_COUNTS, DEFAULT_WIDGET_POST_COUNT),
+      groupCrossPosts: checked(body, 'groupCrossPosts'),
+      includeDrafts: false,
+      refreshMinutes: pickNumber(
+        toString(body['refreshMinutes']),
+        REFRESH_OPTIONS.map(([v]) => v),
+        60,
+      ),
+      windowPastDays: WIDGET_PAST_DAYS,
+      windowFutureDays: 0,
+      statuses: WIDGET_STATUSES,
+      widgetStyle: normalizeWidgetStyle({
+        theme: toString(body['theme']),
+        accent: toString(body['accent']),
+        font: toString(body['font']),
+        fontSize: toString(body['fontSize']),
+        radius: toString(body['radius']),
+        width: toString(body['width']) || 0,
+        height: toString(body['height']),
+        transparent: checked(body, 'transparent'),
+        showHeader: checked(body, 'showHeader'),
+        showChannel: checked(body, 'showChannel'),
+        showMedia: checked(body, 'showMedia'),
+      }),
+    };
+  }
 
   if (format === 'atom') {
     // Atom feeds: only published posts by default, optional drafts toggle
@@ -146,6 +218,7 @@ function readSettings(body: ParsedBody, fallbackName: string, format: OutputForm
       windowPastDays: 30,
       windowFutureDays: 90,
       statuses,
+      widgetStyle: DEFAULT_WIDGET_STYLE,
     };
   }
 
@@ -177,6 +250,7 @@ function readSettings(body: ParsedBody, fallbackName: string, format: OutputForm
       90,
     ),
     statuses: statuses.length ? statuses : ['scheduled'],
+    widgetStyle: DEFAULT_WIDGET_STYLE,
   };
 }
 
@@ -361,12 +435,147 @@ const AtomSettingsFields: FC<{ settings: SindySettings }> = ({ settings }) => (
   </>
 );
 
+const Check: FC<{ name: string; checked: boolean; label: string; hint?: string }> = ({
+  name,
+  checked,
+  label,
+  hint,
+}) => (
+  <div class="checkline">
+    <input type="checkbox" id={name} name={name} value="1" checked={checked} />
+    <label for={name}>
+      {label} {hint ? <small>— {hint}</small> : null}
+    </label>
+  </div>
+);
+
+const WidgetSettingsFields: FC<{ settings: SindySettings }> = ({ settings }) => {
+  const style = settings.widgetStyle;
+  return (
+    <>
+      <div class="row">
+        <Select
+          name="maxItems"
+          label="Posts to show"
+          hint="Only published posts, newest first."
+          options={WIDGET_POST_COUNTS.map((n) => [n, `${n} posts`] as const)}
+          value={settings.maxItems}
+        />
+        <Select
+          name="refreshMinutes"
+          label="Refresh interval"
+          hint="How often new posts are picked up from Buffer."
+          options={REFRESH_OPTIONS}
+          value={settings.refreshMinutes}
+        />
+      </div>
+      <Check
+        name="groupCrossPosts"
+        checked={settings.groupCrossPosts}
+        label="Group cross-posts"
+        hint="show a post sent to several channels once"
+      />
+
+      <h2>How it looks</h2>
+      <div class="row">
+        <div class="field">
+          <label for="theme">Color scheme</label>
+          <select id="theme" name="theme">
+            {WIDGET_THEMES.map(([value, label]) => (
+              <option value={value} selected={value === style.theme}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div class="field">
+          <label for="accent">Accent color</label>
+          <input type="color" id="accent" name="accent" value={style.accent} />
+          <small>Used for links.</small>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="font">Font</label>
+          <select id="font" name="font">
+            {Object.entries(WIDGET_FONTS).map(([key, font]) => (
+              <option value={key} selected={key === style.font}>
+                {font.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <Select
+          name="fontSize"
+          label="Font size"
+          options={WIDGET_FONT_SIZES.map((n) => [n, `${n}px`] as const)}
+          value={style.fontSize}
+        />
+        <Select name="radius" label="Corners" options={WIDGET_RADII} value={style.radius} />
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="width">Max width (px)</label>
+          <input type="number" id="width" name="width" value={String(style.width)} min={0} max={WIDTH_MAX} step={10} />
+          <small>0 fills whatever space the page gives it.</small>
+        </div>
+        <div class="field">
+          <label for="height">Height (px)</label>
+          <input
+            type="number"
+            id="height"
+            name="height"
+            value={String(style.height)}
+            min={HEIGHT_MIN}
+            max={HEIGHT_MAX}
+            step={10}
+          />
+          <small>Posts that don't fit scroll inside the widget.</small>
+        </div>
+      </div>
+
+      <Check name="showHeader" checked={style.showHeader} label="Show the title" hint="above the posts" />
+      <Check name="showChannel" checked={style.showChannel} label="Show the channel" hint="name and network on each post" />
+      <Check name="showMedia" checked={style.showMedia} label="Show images" hint="up to four per post" />
+      <Check
+        name="transparent"
+        checked={style.transparent}
+        label="Transparent background"
+        hint="let your page's background show between posts"
+      />
+    </>
+  );
+};
+
+const SettingsFields: FC<{ settings: SindySettings }> = ({ settings }) =>
+  settings.format === 'ics' ? (
+    <IcsSettingsFields settings={settings} />
+  ) : settings.format === 'atom' ? (
+    <AtomSettingsFields settings={settings} />
+  ) : (
+    <WidgetSettingsFields settings={settings} />
+  );
+
+const NAME_LABEL: Record<OutputFormat, string> = {
+  ics: 'Calendar name',
+  atom: 'Feed name',
+  widget: 'Widget title',
+};
+
+const NAME_HINT: Record<OutputFormat, string> = {
+  ics: 'Shown as the name in your calendar app.',
+  atom: 'Shown as the name in your feed reader app.',
+  widget: 'Shown above your posts, if you keep the title on.',
+};
+
 const SharedSettingsFields: FC<{ settings: SindySettings }> = ({ settings }) => (
   <>
     <div class="field">
-      <label for="name">{settings.format === 'ics' ? 'Calendar name' : 'Feed name'}</label>
+      <label for="name">{NAME_LABEL[settings.format]}</label>
       <input type="text" id="name" name="name" value={settings.name} maxlength={120} required />
-      <small>Shown as the name in your calendar or feed reader app.</small>
+      <small>{NAME_HINT[settings.format]}</small>
     </div>
 
     {settings.format === 'ics' ? (
@@ -411,6 +620,7 @@ const SharedSettingsFields: FC<{ settings: SindySettings }> = ({ settings }) => 
 // -- dashboard --------------------------------------------------------------
 
 function feedUrls(baseUrl: string, token: string, format: OutputFormat) {
+  if (format === 'widget') return { https: embedUrl(baseUrl, token) };
   const ext = format === 'ics' ? '.ics' : '.xml';
   const https = `${baseUrl.replace(/\/$/, '')}/feed/${token}${ext}`;
   return { https };
@@ -425,7 +635,7 @@ function syncState(output: OutputWithChannels): { cls: string; text: string } {
   const when =
     ageMinutes < 1 ? 'just now' : ageMinutes < 60 ? `${ageMinutes}m ago` : `${Math.round(ageMinutes / 60)}h ago`;
 
-  const noun = output.format === 'ics' ? 'events' : 'items';
+  const noun = output.format === 'ics' ? 'events' : output.format === 'atom' ? 'items' : 'posts';
 
   return {
     cls: stale ? 'stale' : '',
@@ -436,7 +646,27 @@ function syncState(output: OutputWithChannels): { cls: string; text: string } {
 const FORMAT_LABEL: Record<OutputFormat, string> = {
   ics: 'Calendar (ICS)',
   atom: 'Feed (Atom/RSS)',
+  widget: 'Embeddable widget',
 };
+
+/** What a sindy of each format is called in running copy. */
+const FORMAT_NOUN: Record<OutputFormat, string> = {
+  ics: 'calendar',
+  atom: 'feed',
+  widget: 'widget',
+};
+
+const FORMATS: OutputFormat[] = ['ics', 'atom', 'widget'];
+
+const CHANNEL_PROMPT: Record<OutputFormat, string> = {
+  ics: 'Pick the channels whose posts should appear on the calendar.',
+  atom: 'Pick the channels whose posts should appear in the feed.',
+  widget: 'Pick the channels whose published posts should appear in the widget.',
+};
+
+function storedWidgetStyle(settings: SindySettings): string | null {
+  return settings.format === 'widget' ? serializeWidgetStyle(settings.widgetStyle) : null;
+}
 
 outputRoutes.get('/sindies', async (c) => {
   const user = c.get('user')!;
@@ -445,7 +675,10 @@ outputRoutes.get('/sindies', async (c) => {
   return c.html(
     <Layout title="Your sindies — social sindy" user={user}>
       <h1>Your sindies</h1>
-      <p class="lede">Each sindy is one subscribable feed of your Buffer schedule — a calendar or a content feed.</p>
+      <p class="lede">
+        Each sindy is one view of your Buffer posts — a calendar, a content feed, or a widget for
+        your website.
+      </p>
 
       {outputs.length === 0 ? (
         <div class="panel">
@@ -477,7 +710,7 @@ outputRoutes.get('/sindies', async (c) => {
                     </div>
                   </div>
                   <a class="btn btn-quiet" href={`/sindies/${output.id}`}>
-                    {output.format === 'ics' ? 'Subscribe' : 'View'}
+                    {output.format === 'ics' ? 'Subscribe' : output.format === 'widget' ? 'Embed' : 'View'}
                   </a>
                 </div>
               </div>
@@ -544,7 +777,7 @@ function bufferErrorPage(c: AppContext, error: unknown) {
 outputRoutes.get('/sindies/new', async (c) => {
   const user = c.get('user')!;
   const organizationId = c.req.query('org');
-  const format = (c.req.query('format') === 'atom' ? 'atom' : 'ics') as OutputFormat;
+  const format = parseFormat(c.req.query('format'));
 
   try {
     const account = await accountFor(c.env, user.id);
@@ -588,34 +821,28 @@ outputRoutes.get('/sindies/new', async (c) => {
       format,
       eventDurationMinutes: 15,
       showChannelInTitle: true,
-      maxItems: 50,
+      maxItems: format === 'widget' ? DEFAULT_WIDGET_POST_COUNT : 50,
       groupCrossPosts: true,
       includeDrafts: false,
       refreshMinutes: 60,
-      windowPastDays: 30,
-      windowFutureDays: 90,
+      windowPastDays: format === 'widget' ? WIDGET_PAST_DAYS : 30,
+      windowFutureDays: format === 'widget' ? 0 : 90,
       statuses: format === 'ics' ? ['scheduled', 'sent'] : ['sent'],
+      widgetStyle: DEFAULT_WIDGET_STYLE,
     };
 
     return c.html(
       <Layout title="Choose channels — social sindy" user={user}>
         <Steps at={2} />
         <h1>{organization.name}</h1>
-        <p class="lede">
-          {format === 'ics'
-            ? 'Pick the channels whose posts should appear on the calendar.'
-            : 'Pick the channels whose posts should appear in the feed.'}
-        </p>
+        <p class="lede">{CHANNEL_PROMPT[format]}</p>
 
         <div class="format-toggle" style="margin-bottom:1.5rem">
-          <a class={`fmt-btn ${format === 'ics' ? 'active' : ''}`}
-             href={`/sindies/new?org=${organizationId}&format=ics`}>
-            Calendar (ICS)
-          </a>
-          <a class={`fmt-btn ${format === 'atom' ? 'active' : ''}`}
-             href={`/sindies/new?org=${organizationId}&format=atom`}>
-            Feed (Atom/RSS)
-          </a>
+          {FORMATS.map((f) => (
+            <a class={`fmt-btn ${format === f ? 'active' : ''}`} href={`/sindies/new?org=${organizationId}&format=${f}`}>
+              {FORMAT_LABEL[f]}
+            </a>
+          ))}
         </div>
 
         <form method="post" action="/sindies">
@@ -631,12 +858,12 @@ outputRoutes.get('/sindies/new', async (c) => {
 
           <div class="panel">
             <SharedSettingsFields settings={settings} />
-            {format === 'ics' ? <IcsSettingsFields settings={settings} /> : <AtomSettingsFields settings={settings} />}
+            <SettingsFields settings={settings} />
           </div>
 
           <div class="btn-row">
             <button type="submit" disabled={channels.length === 0}>
-              Create {format === 'ics' ? 'calendar' : 'feed'}
+              Create {FORMAT_NOUN[format]}
             </button>
             <a class="btn btn-quiet" href="/sindies">
               Cancel
@@ -654,7 +881,7 @@ outputRoutes.post('/sindies', async (c) => {
   const user = c.get('user')!;
   const body = (await c.req.parseBody({ all: true })) as ParsedBody;
   const organizationId = toString(body['organizationId']);
-  const format = (toString(body['format']) === 'atom' ? 'atom' : 'ics') as OutputFormat;
+  const format = parseFormat(toString(body['format']));
 
   if (!organizationId) return c.redirect('/sindies/new', 302);
 
@@ -696,6 +923,7 @@ outputRoutes.post('/sindies', async (c) => {
       showChannelInTitle: settings.showChannelInTitle,
       maxItems: settings.maxItems,
       groupCrossPosts: settings.groupCrossPosts,
+      widgetStyle: storedWidgetStyle(settings),
       refreshMinutes: settings.refreshMinutes,
       windowPastDays: settings.windowPastDays,
       windowFutureDays: settings.windowFutureDays,
@@ -710,6 +938,57 @@ outputRoutes.post('/sindies', async (c) => {
 
 // -- show -------------------------------------------------------------------
 
+/**
+ * Embed code and a live preview. The preview frames the real embed URL, but by
+ * path rather than the absolute origin, so it also works on a preview deploy
+ * or local dev whose host differs from APP_BASE_URL.
+ */
+const WidgetEmbedPanels: FC<{ output: OutputWithChannels; baseUrl: string }> = ({ output, baseUrl }) => {
+  const style = parseWidgetStyle(output.widget_style);
+  const snippet = embedSnippet(baseUrl, output.feed_token, output.name, style);
+  const direct = embedUrl(baseUrl, output.feed_token);
+  const previewStyle = `width:100%;${style.width ? `max-width:${style.width}px;` : ''}height:${style.height}px`;
+
+  return (
+    <>
+      <div class="panel">
+        <h3>Embed code</h3>
+        <p class="small">
+          Paste this into your website, blog, or link-in-bio page wherever it accepts HTML. Unlike
+          calendar and feed URLs, this one is meant to be public: it only ever shows posts that are
+          already published.
+        </p>
+        <div class="snippet">
+          <code>{snippet}</code>
+          <button type="button" class="btn-quiet" data-copy={snippet}>
+            Copy embed code
+          </button>
+        </div>
+        <p class="small">
+          Only takes a link? Use the widget URL on its own:
+        </p>
+        <div class="url">
+          <code>{direct}</code>
+          <button type="button" class="btn-quiet" data-copy={direct}>
+            Copy
+          </button>
+        </div>
+      </div>
+
+      <h2>Preview</h2>
+      <div class="panel">
+        <iframe
+          class="preview"
+          src={`/embed/${output.feed_token}`}
+          title={`Preview of ${output.name}`}
+          style={previewStyle}
+          loading="lazy"
+        />
+      </div>
+    </>
+  );
+};
+
 outputRoutes.get('/sindies/:id', async (c) => {
   const user = c.get('user')!;
   const output = await getOutput(c.env.DB, c.req.param('id'), user.id);
@@ -720,6 +999,9 @@ outputRoutes.get('/sindies/:id', async (c) => {
   const state = syncState(output);
 
   const isIcs = output.format === 'ics';
+  const isWidget = output.format === 'widget';
+  const refreshLabel =
+    output.refresh_minutes >= 60 ? `${Math.round(output.refresh_minutes / 60)}h` : `${output.refresh_minutes}m`;
 
   return c.html(
     <Layout title={`${output.name} — social sindy`} user={user}>
@@ -729,8 +1011,14 @@ outputRoutes.get('/sindies/:id', async (c) => {
         {output.organization_name} · {output.channels.map((ch) => ch.channel_name).join(', ')}
       </p>
 
-      {justCreated ? <Notice>Your {isIcs ? 'calendar' : 'feed'} is ready. Subscribe to it below.</Notice> : null}
+      {justCreated ? (
+        <Notice>
+          Your {FORMAT_NOUN[output.format]} is ready.{' '}
+          {isWidget ? 'Copy the embed code below into your site.' : 'Subscribe to it below.'}
+        </Notice>
+      ) : null}
 
+      {isWidget ? <WidgetEmbedPanels output={output} baseUrl={c.env.APP_BASE_URL} /> : (
       <div class="panel">
         <h3>Subscription URL</h3>
         <p class="small">
@@ -744,15 +1032,21 @@ outputRoutes.get('/sindies/:id', async (c) => {
           </button>
         </div>
       </div>
+      )}
 
-      {isIcs ? (
+      {isWidget ? (
+        <Notice>
+          <p>
+            <strong>How quickly it updates.</strong> New posts show up within the refresh interval
+            you chose ({refreshLabel}) of being published. Every visitor to your page is served
+            the same cached copy, so traffic to your site never spends your Buffer quota.
+          </p>
+        </Notice>
+      ) : isIcs ? (
         <Notice>
           <p>
             <strong>How quickly it updates.</strong> Apple Calendar and Outlook will follow the
-            refresh rate you chose ({output.refresh_minutes >= 60
-              ? `${Math.round(output.refresh_minutes / 60)}h`
-              : `${output.refresh_minutes}m`}
-            ). Google Calendar may refresh less frequently, typically every 8-24 hours, and does not
+            refresh rate you chose ({refreshLabel}). Google Calendar may refresh less frequently, typically every 8-24 hours, and does not
             offer a way to refresh on demand.
           </p>
         </Notice>
@@ -760,10 +1054,7 @@ outputRoutes.get('/sindies/:id', async (c) => {
         <Notice>
           <p>
             <strong>How quickly it updates.</strong> RSS readers will follow the refresh rate you
-            chose ({output.refresh_minutes >= 60
-              ? `${Math.round(output.refresh_minutes / 60)}h`
-              : `${output.refresh_minutes}m`}
-            ). Your feed reader may poll on its own schedule.
+            chose ({refreshLabel}). Your feed reader may poll on its own schedule.
           </p>
         </Notice>
       )}
@@ -773,7 +1064,7 @@ outputRoutes.get('/sindies/:id', async (c) => {
         <p class="small">
           <span class={`state ${state.cls}`} />
           {state.text}
-          {output.last_polled_at ? (
+          {isWidget ? null : output.last_polled_at ? (
             <>
               <br />
               Last polled by a client: {output.last_polled_at}
@@ -796,7 +1087,11 @@ outputRoutes.get('/sindies/:id', async (c) => {
           <form
             method="post"
             action={`/sindies/${output.id}/rotate`}
-            onsubmit="return confirm('Replace the URL? You will need to re-subscribe in every app.')"
+            onsubmit={
+              isWidget
+                ? "return confirm('Replace the URL? The widget will stop working on every site until you paste the new embed code.')"
+                : "return confirm('Replace the URL? You will need to re-subscribe in every app.')"
+            }
           >
             <button class="btn btn-quiet" type="submit">
               Replace URL
@@ -805,7 +1100,11 @@ outputRoutes.get('/sindies/:id', async (c) => {
           <form
             method="post"
             action={`/sindies/${output.id}/delete`}
-            onsubmit="return confirm('Delete this sindy? The feed URL will stop working.')"
+            onsubmit={
+              isWidget
+                ? "return confirm('Delete this widget? It will stop working on every site it is embedded in.')"
+                : "return confirm('Delete this sindy? The feed URL will stop working.')"
+            }
           >
             <button class="btn-danger" type="submit">
               Delete sindy
@@ -842,11 +1141,12 @@ outputRoutes.get('/sindies/:id/edit', async (c) => {
       windowPastDays: output.window_past_days,
       windowFutureDays: output.window_future_days,
       statuses: parseStatuses(output.statuses),
+      widgetStyle: parseWidgetStyle(output.widget_style),
     };
 
     return c.html(
       <Layout title={`Edit ${output.name} — social sindy`} user={user}>
-        <h1>Edit {output.format === 'ics' ? 'calendar' : 'feed'}</h1>
+        <h1>Edit {FORMAT_NOUN[output.format]}</h1>
         <p class="lede">{output.organization_name} · {FORMAT_LABEL[output.format]}</p>
 
         <form method="post" action={`/sindies/${output.id}`}>
@@ -856,7 +1156,7 @@ outputRoutes.get('/sindies/:id/edit', async (c) => {
           </div>
           <div class="panel">
             <SharedSettingsFields settings={settings} />
-            {output.format === 'ics' ? <IcsSettingsFields settings={settings} /> : <AtomSettingsFields settings={settings} />}
+            <SettingsFields settings={settings} />
           </div>
           <div class="btn-row">
             <button type="submit">Save changes</button>
@@ -899,6 +1199,7 @@ outputRoutes.post('/sindies/:id', async (c) => {
       showChannelInTitle: settings.showChannelInTitle,
       maxItems: settings.maxItems,
       groupCrossPosts: settings.groupCrossPosts,
+      widgetStyle: storedWidgetStyle(settings),
       refreshMinutes: settings.refreshMinutes,
       windowPastDays: settings.windowPastDays,
       windowFutureDays: settings.windowFutureDays,

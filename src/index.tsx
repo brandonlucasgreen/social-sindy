@@ -10,6 +10,7 @@
  *   /privacy            privacy policy
  *   /feed/:token.ics    the public ICS feed calendar clients poll
  *   /feed/:token.xml    the public Atom feed RSS readers poll
+ *   /embed/:token       the public widget page websites embed in an iframe
  *
  * Also exports a `scheduled` handler, which is what makes the Google push
  * timely — the one thing a subscribed ICS feed cannot be.
@@ -66,33 +67,66 @@ const LEGACY_HOSTS = new Set(['social-sindy.bgreen.lol', 'social-cally.bgreen.lo
  * on the very response that's upgrading a visitor to HTTPS, must not depend
  * on whether that particular request happened to redirect.
  */
-app.use(
-  '*',
-  secureHeaders({
-    strictTransportSecurity: 'max-age=31536000; includeSubDomains',
-    xFrameOptions: 'DENY',
-    referrerPolicy: 'strict-origin-when-cross-origin',
-    // Empty arrays, not `false`: hono renders `false` as the legacy
-    // Feature-Policy token `none`, but the Permissions-Policy spec's
-    // structured-header syntax for "deny to everyone" is an empty list, `()`.
-    permissionsPolicy: { geolocation: [], camera: [], microphone: [] },
-    contentSecurityPolicy: {
-      defaultSrc: ["'self'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"],
-      frameAncestors: ["'none'"],
-      objectSrc: ["'none'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", 'https://gc.zgo.at', 'https://static.cloudflareinsights.com'],
-      styleSrc: ["'self'", "'unsafe-inline'", 'https://api.fonts.coollabs.io'],
-      fontSrc: ["'self'", 'https://cdn.fonts.coollabs.io'],
-      imgSrc: ["'self'", 'data:'],
-      connectSrc: [
-        "'self'",
-        'https://social-sindy.goatcounter.com',
-        'https://static.cloudflareinsights.com',
-      ],
-    },
-  }),
+const appSecureHeaders = secureHeaders({
+  strictTransportSecurity: 'max-age=31536000; includeSubDomains',
+  xFrameOptions: 'DENY',
+  referrerPolicy: 'strict-origin-when-cross-origin',
+  // Empty arrays, not `false`: hono renders `false` as the legacy
+  // Feature-Policy token `none`, but the Permissions-Policy spec's
+  // structured-header syntax for "deny to everyone" is an empty list, `()`.
+  permissionsPolicy: { geolocation: [], camera: [], microphone: [] },
+  contentSecurityPolicy: {
+    defaultSrc: ["'self'"],
+    baseUri: ["'self'"],
+    formAction: ["'self'"],
+    frameAncestors: ["'none'"],
+    objectSrc: ["'none'"],
+    scriptSrc: ["'self'", "'unsafe-inline'", 'https://gc.zgo.at', 'https://static.cloudflareinsights.com'],
+    styleSrc: ["'self'", "'unsafe-inline'", 'https://api.fonts.coollabs.io'],
+    fontSrc: ["'self'", 'https://cdn.fonts.coollabs.io'],
+    imgSrc: ["'self'", 'data:'],
+    connectSrc: [
+      "'self'",
+      'https://social-sindy.goatcounter.com',
+      'https://static.cloudflareinsights.com',
+    ],
+  },
+});
+
+/**
+ * The widget is the one surface that exists to be framed by other sites, so it
+ * gets its own policy instead of the app's `frame-ancestors 'none'` and
+ * `X-Frame-Options: DENY`. Everything else is tighter than the app's: the page
+ * is static HTML with no script at all, so `script-src` falls to
+ * `default-src 'none'` — which also keeps analytics and Cloudflare's injected
+ * beacon off other people's websites. Images are open to any https host
+ * because post media lives on whatever CDN the network uses.
+ *
+ * Selected per request rather than layered, because `secureHeaders` writes its
+ * headers after the handler runs and would overwrite anything the route set.
+ */
+const embedSecureHeaders = secureHeaders({
+  strictTransportSecurity: 'max-age=31536000; includeSubDomains',
+  xFrameOptions: false,
+  crossOriginResourcePolicy: 'cross-origin',
+  crossOriginOpenerPolicy: false,
+  referrerPolicy: 'no-referrer',
+  permissionsPolicy: { geolocation: [], camera: [], microphone: [] },
+  contentSecurityPolicy: {
+    defaultSrc: ["'none'"],
+    baseUri: ["'none'"],
+    formAction: ["'none'"],
+    frameAncestors: ['*'],
+    styleSrc: ["'unsafe-inline'", 'https://api.fonts.coollabs.io'],
+    fontSrc: ['https://cdn.fonts.coollabs.io'],
+    imgSrc: ['https:', 'data:'],
+  },
+});
+
+const EMBED_PREFIX = '/embed/';
+
+app.use('*', (c, next) =>
+  c.req.path.startsWith(EMBED_PREFIX) ? embedSecureHeaders(c, next) : appSecureHeaders(c, next),
 );
 
 /**
@@ -168,9 +202,33 @@ app.on(['GET', 'HEAD'], '/feed/:file', async (c) => {
   const output = await getOutputByToken(c.env.DB, token);
 
   // Same response for a malformed token and a deleted output, so the endpoint
-  // does not confirm which tokens ever existed.
-  if (!output) {
+  // does not confirm which tokens ever existed. A widget's token is served only
+  // from /embed, so each format answers at exactly one place.
+  if (!output || output.format === 'widget') {
     return c.text('This feed does not exist.\n', 404, {
+      'Content-Type': 'text/plain; charset=utf-8',
+    });
+  }
+
+  return respondWithFeed(c.env, output, c.req.raw, {
+    waitUntil: (promise) => c.executionCtx.waitUntil(promise),
+  });
+});
+
+/**
+ * The embeddable widget. Outside the session and CSRF middleware for the same
+ * reason as the feed: it is fetched by visitors to someone else's website, who
+ * have no session here and send a cross-site Origin.
+ *
+ * Only widget outputs answer. An ICS or Atom token must never render here —
+ * those feeds can carry scheduled posts and drafts, and this route's headers
+ * allow any site to frame it.
+ */
+app.on(['GET', 'HEAD'], '/embed/:token', async (c) => {
+  const output = await getOutputByToken(c.env.DB, c.req.param('token'));
+
+  if (!output || output.format !== 'widget') {
+    return c.text('This widget does not exist.\n', 404, {
       'Content-Type': 'text/plain; charset=utf-8',
     });
   }
