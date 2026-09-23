@@ -65,7 +65,7 @@ pnpm db:migrate:local
 pnpm dev
 ```
 
-The Worker runs on `http://localhost:8787`. Buffer OAuth requires a public HTTPS redirect URI, so sign-in itself is only testable on a deployed origin — feed rendering, ICS/Atom generation, and the management UI all work locally against seeded data.
+The Worker runs on `http://localhost:8787`. Buffer OAuth requires a public HTTPS redirect URI, so sign-in only works on a deployed origin. Locally you can see the public pages (landing, FAQ, privacy, terms), but not the management UI or any feed, because those need a signed-in user and there is no seed script. ICS, Atom, and widget generation are covered by `pnpm test` instead. To test anything behind sign-in, deploy it.
 
 ### Secrets
 

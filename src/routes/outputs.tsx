@@ -27,6 +27,7 @@ import { avatarCssValue, proxiedAvatarUrl } from '../avatar.js';
 import type { Env } from '../env.js';
 import { channelInitial, serviceColor, serviceLabel } from '../present.js';
 import { Layout, Notice, Steps } from '../ui/layout.jsx';
+import { refreshFeed } from '../feed.js';
 import {
   DEFAULT_WIDGET_POST_COUNT,
   DEFAULT_WIDGET_STYLE,
@@ -43,6 +44,7 @@ import {
   normalizeWidgetStyle,
   parseWidgetStyle,
   serializeWidgetStyle,
+  widgetColorScheme,
   type WidgetStyle,
 } from '../widget/style.js';
 import {
@@ -626,6 +628,8 @@ function feedUrls(baseUrl: string, token: string, format: OutputFormat) {
   return { https };
 }
 
+const ITEM_NOUN: Record<OutputFormat, string> = { ics: 'events', atom: 'items', widget: 'posts' };
+
 function syncState(output: OutputWithChannels): { cls: string; text: string } {
   if (output.last_error) return { cls: 'bad', text: `Last refresh failed: ${output.last_error}` };
   if (!output.last_fetched_at) return { cls: 'stale', text: 'Not fetched yet' };
@@ -635,7 +639,7 @@ function syncState(output: OutputWithChannels): { cls: string; text: string } {
   const when =
     ageMinutes < 1 ? 'just now' : ageMinutes < 60 ? `${ageMinutes}m ago` : `${Math.round(ageMinutes / 60)}h ago`;
 
-  const noun = output.format === 'ics' ? 'events' : output.format === 'atom' ? 'items' : 'posts';
+  const noun = ITEM_NOUN[output.format];
 
   return {
     cls: stale ? 'stale' : '',
@@ -947,7 +951,13 @@ const WidgetEmbedPanels: FC<{ output: OutputWithChannels; baseUrl: string }> = (
   const style = parseWidgetStyle(output.widget_style);
   const snippet = embedSnippet(baseUrl, output.feed_token, output.name, style);
   const direct = embedUrl(baseUrl, output.feed_token);
-  const previewStyle = `width:100%;${style.width ? `max-width:${style.width}px;` : ''}height:${style.height}px`;
+  const previewStyle =
+    `width:100%;${style.width ? `max-width:${style.width}px;` : ''}height:${style.height}px;` +
+    `color-scheme:${widgetColorScheme(style)}`;
+  // Versioned by the last edit and the last refresh. Browsers keep the embed
+  // for minutes, and without this the preview would go on showing the widget
+  // as it was before the change the owner just made.
+  const version = encodeURIComponent(`${output.updated_at}|${output.last_fetched_at ?? ''}`);
 
   return (
     <>
@@ -979,7 +989,7 @@ const WidgetEmbedPanels: FC<{ output: OutputWithChannels; baseUrl: string }> = (
       <div class="panel">
         <iframe
           class="preview"
-          src={`/embed/${output.feed_token}`}
+          src={`/embed/${output.feed_token}?v=${version}`}
           title={`Preview of ${output.name}`}
           style={previewStyle}
           loading="lazy"
@@ -996,6 +1006,7 @@ outputRoutes.get('/sindies/:id', async (c) => {
 
   const urls = feedUrls(c.env.APP_BASE_URL, output.feed_token, output.format);
   const justCreated = c.req.query('created') === '1';
+  const refreshed = c.req.query('refreshed');
   const state = syncState(output);
 
   const isIcs = output.format === 'ics';
@@ -1016,6 +1027,16 @@ outputRoutes.get('/sindies/:id', async (c) => {
           Your {FORMAT_NOUN[output.format]} is ready.{' '}
           {isWidget ? 'Copy the embed code below into your site.' : 'Subscribe to it below.'}
         </Notice>
+      ) : null}
+
+      {refreshed === '1' ? (
+        <Notice>
+          {output.last_error
+            ? 'Refreshed, but Buffer returned an error. The details are under Status below.'
+            : `Refreshed from Buffer just now: ${output.last_event_count ?? 0} ${ITEM_NOUN[output.format]}.`}
+        </Notice>
+      ) : refreshed === 'wait' ? (
+        <Notice>This sindy was refreshed less than a minute ago. Give it a moment before trying again.</Notice>
       ) : null}
 
       {isWidget ? <WidgetEmbedPanels output={output} baseUrl={c.env.APP_BASE_URL} /> : (
@@ -1076,6 +1097,19 @@ outputRoutes.get('/sindies/:id', async (c) => {
             </>
           )}
         </p>
+        {isWidget ? null : (
+          <p class="small">
+            {isIcs ? 'Calendar apps' : 'Feed readers'} fetch this feed on their own schedule, and
+            social sindy only checks Buffer when one asks. If "last polled" is old, the app has
+            probably stopped checking this URL. Re-subscribe in it, or replace the URL below.
+          </p>
+        )}
+        <form method="post" action={`/sindies/${output.id}/refresh`}>
+          <button class="btn btn-quiet" type="submit">
+            Refresh now
+          </button>
+          <small> Fetches your posts from Buffer immediately and shows the result here.</small>
+        </form>
       </div>
 
       <h2>Manage</h2>
@@ -1210,6 +1244,28 @@ outputRoutes.post('/sindies/:id', async (c) => {
   } catch (error) {
     return bufferErrorPage(c, error);
   }
+});
+
+/**
+ * The owner's manual refresh: the way to see whether the Buffer connection
+ * still works without waiting for a client to poll. It is rate-limited to once
+ * a minute, because each refresh spends at least one request from a Buffer
+ * quota that can be as low as 250 a day.
+ */
+const MANUAL_REFRESH_COOLDOWN_MS = 60_000;
+
+outputRoutes.post('/sindies/:id/refresh', async (c) => {
+  const user = c.get('user')!;
+  const output = await getOutput(c.env.DB, c.req.param('id'), user.id);
+  if (!output) return c.notFound();
+
+  const last = output.last_fetched_at ? Date.parse(output.last_fetched_at) : 0;
+  if (Date.now() - last < MANUAL_REFRESH_COOLDOWN_MS) {
+    return c.redirect(`/sindies/${output.id}?refreshed=wait`, 302);
+  }
+
+  await refreshFeed(c.env, output);
+  return c.redirect(`/sindies/${output.id}?refreshed=1`, 302);
 });
 
 outputRoutes.post('/sindies/:id/rotate', async (c) => {

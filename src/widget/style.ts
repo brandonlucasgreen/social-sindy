@@ -182,6 +182,19 @@ export function serializeWidgetStyle(style: WidgetStyle): string {
   return JSON.stringify(normalizeWidgetStyle(style));
 }
 
+/**
+ * The `color-scheme` both sides of the iframe declare.
+ *
+ * A browser paints an opaque canvas behind an iframe whenever the iframe
+ * element's used color scheme differs from the embedded page's, which silently
+ * defeats a transparent background. The host page's scheme is unknowable, but
+ * the iframe element's is not: the snippet sets it inline, so it always matches
+ * the widget page no matter what the host declares.
+ */
+export function widgetColorScheme(style: WidgetStyle): string {
+  return style.theme === 'auto' ? 'light dark' : style.theme;
+}
+
 /** The URL a site embeds in its iframe. */
 export function embedUrl(baseUrl: string, token: string): string {
   return `${baseUrl.replace(/\/$/, '')}/embed/${token}`;
@@ -198,7 +211,9 @@ function escapeAttr(text: string): string {
  */
 export function embedSnippet(baseUrl: string, token: string, title: string, style: WidgetStyle): string {
   const width = style.width === 0 ? 'width:100%' : `width:100%;max-width:${style.width}px`;
-  const css = `${width};height:${style.height}px;border:0;${style.transparent ? 'background:transparent;' : ''}`;
+  const css =
+    `${width};height:${style.height}px;border:0;color-scheme:${widgetColorScheme(style)};` +
+    (style.transparent ? 'background:transparent;' : '');
   return (
     `<iframe src="${escapeAttr(embedUrl(baseUrl, token))}" title="${escapeAttr(title)}" ` +
     `style="${css}" loading="lazy"${style.transparent ? ' allowtransparency="true"' : ''}></iframe>`

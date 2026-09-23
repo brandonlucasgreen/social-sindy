@@ -16,7 +16,7 @@
 import { groupPosts } from '../atom/generate.js';
 import type { BufferAsset, BufferPost } from '../buffer/types.js';
 import { resolveChannel, serviceColor, serviceLabel, type ChannelRef } from '../present.js';
-import { WIDGET_FONTS, type WidgetStyle } from './style.js';
+import { WIDGET_FONTS, widgetColorScheme, type WidgetStyle } from './style.js';
 
 export interface WidgetOptions {
   name: string;
@@ -159,12 +159,10 @@ function stylesheet(style: WidgetStyle): string {
   const light = `--bg:#ffffff;--card:hsl(210 20% 98%);--text:hsl(210 15% 16%);--dim:hsl(210 10% 42%);--line:hsl(210 16% 88%);`;
   const dark = `--bg:hsl(210 12% 14%);--card:hsl(210 12% 18%);--text:hsl(210 20% 96%);--dim:hsl(210 10% 70%);--line:hsl(210 6% 27%);`;
 
-  // A transparent iframe only stays transparent if its color-scheme matches the
-  // host page's, and the host's is unknowable — declaring none ('normal')
-  // matches the common case, and the palette below still follows the theme.
-  const scheme = style.transparent
-    ? ''
-    : `color-scheme:${style.theme === 'auto' ? 'light dark' : style.theme};`;
+  // Always declared, transparent or not: the embed snippet sets the same value
+  // on the iframe element, which is what keeps a transparent background
+  // transparent (see widgetColorScheme).
+  const scheme = `color-scheme:${widgetColorScheme(style)};`;
 
   const palette =
     style.theme === 'light'

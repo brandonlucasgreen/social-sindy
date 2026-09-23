@@ -688,6 +688,22 @@ export async function deleteOutput(db: D1Database, outputId: string): Promise<vo
 }
 
 /** Records that a client polled the feed, whether or not Buffer was hit. */
+/**
+ * Records a refresh the owner asked for. Unlike recordPoll it leaves
+ * last_polled_at alone, because that field reports when a calendar app or reader
+ * last asked for the feed, and a manual refresh is neither.
+ */
+export async function recordRefresh(
+  db: D1Database,
+  outputId: string,
+  outcome: { eventCount: number | null; error: string | null },
+): Promise<void> {
+  await db
+    .prepare('UPDATE outputs SET last_fetched_at = ?, last_event_count = ?, last_error = ? WHERE id = ?')
+    .bind(now(), outcome.eventCount, outcome.error, outputId)
+    .run();
+}
+
 export async function recordPoll(
   db: D1Database,
   outputId: string,

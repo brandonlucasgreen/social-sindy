@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { BufferRateLimitError } from '../src/buffer/client.js';
-import { cachedFeed, etagFor, respondWithFeed } from '../src/feed.js';
+import { cachedFeed, etagFor, refreshFeed, respondWithFeed } from '../src/feed.js';
 import type { OutputWithChannels } from '../src/db.js';
 import type { Env } from '../src/env.js';
 
@@ -218,6 +218,19 @@ describe('respondWithFeed', () => {
     expect(await response.text()).toBe(ICS_A);
   });
 
+  it('caps a widget\'s browser cache at five minutes, whatever its refresh interval', async () => {
+    const kv = fakeKv();
+    await kv.namespace.put('feed:fresh:out_1:2026-07-01T00:00:00.000Z', '<!doctype html>');
+
+    const response = await respondWithFeed(
+      env(kv.namespace),
+      output({ format: 'widget', refresh_minutes: 360 }),
+      new Request('https://example.com/embed/tok'),
+    );
+
+    expect(response.headers.get('Cache-Control')).toBe('public, max-age=300');
+  });
+
   it('serves an Atom feed with the right content type', async () => {
     const atomBody = '<?xml version="1.0" encoding="UTF-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom"><entry></entry></feed>';
     const kv = fakeKv();
@@ -283,5 +296,18 @@ describe('respondWithFeed', () => {
 
     expect(response.status).toBe(503);
     expect(response.headers.get('Retry-After')).toBeTruthy();
+  });
+});
+describe('refreshFeed', () => {
+  it('skips the cached render and reports a failure instead of throwing', async () => {
+    const kv = fakeKv();
+    await kv.namespace.put('feed:fresh:out_1:2026-07-01T00:00:00.000Z', ICS_A);
+
+    // The fake D1 holds no Buffer credential, so the re-render cannot fetch.
+    const outcome = await refreshFeed(env(kv.namespace), output());
+
+    expect(kv.namespace.delete).toHaveBeenCalledWith('feed:fresh:out_1:2026-07-01T00:00:00.000Z');
+    expect(outcome.eventCount).toBeNull();
+    expect(outcome.error).toEqual(expect.any(String));
   });
 });

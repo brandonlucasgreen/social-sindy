@@ -14,11 +14,11 @@
  */
 
 import { BufferRateLimitError } from './buffer/client.js';
-import { recordPoll, type OutputWithChannels } from './db.js';
+import { recordPoll, recordRefresh, type OutputWithChannels } from './db.js';
 import type { Env } from './env.js';
 import { generateIcs, type ChannelRef } from './ics/generate.js';
 import { generateAtom } from './atom/generate.js';
-import { postsForOutput } from './sync/posts.js';
+import { invalidatePosts, postsForOutput } from './sync/posts.js';
 import { generateWidget, POST_MARKER } from './widget/generate.js';
 import { parseWidgetStyle } from './widget/style.js';
 
@@ -191,6 +191,37 @@ async function renderWidget(
   });
 }
 
+/**
+ * Re-renders an output now, skipping both caches, and records the outcome for
+ * the owner's status line. It powers the dashboard's "Refresh now" button, the
+ * owner's way to check a feed without waiting for a client to poll it. A
+ * failure is recorded rather than thrown, so a broken connection shows up as
+ * the real Buffer error on the page.
+ *
+ * The last-good copy is kept on failure, so a subscribed feed still falls back
+ * to it.
+ */
+export async function refreshFeed(
+  env: Env,
+  output: OutputWithChannels,
+  now: Date = new Date(),
+): Promise<{ eventCount: number | null; error: string | null }> {
+  await Promise.all([env.FEED_CACHE.delete(freshKey(output)), invalidatePosts(env, output)]);
+
+  let outcome: { eventCount: number | null; error: string | null };
+  try {
+    const result = await buildFeed(env, output, now);
+    outcome = result.stale
+      ? { eventCount: null, error: 'Buffer could not be reached; the feed is serving its last good copy.' }
+      : { eventCount: result.eventCount, error: null };
+  } catch (error) {
+    outcome = { eventCount: null, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+
+  await recordRefresh(env.DB, output.id, outcome);
+  return outcome;
+}
+
 /** Weak validator over the rendered body, so unchanged feeds can 304. */
 export async function etagFor(body: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body) as BufferSource);
@@ -206,6 +237,22 @@ const CONTENT_TYPES = {
   atom: 'application/atom+xml; charset=utf-8',
   widget: 'text/html; charset=utf-8',
 } as const;
+
+/**
+ * Subscription feeds are cached for their whole refresh interval: a calendar
+ * or reader re-fetching sooner would only get the same KV copy. A widget is
+ * capped at five minutes instead, because the browser showing it is often
+ * its owner's, straight after an edit or a manual refresh. A 6-hour browser
+ * copy would keep an old or empty widget on screen long after the server
+ * rendered a new one. The server-side cache still spares Buffer, so the
+ * shorter cap only costs cheap Worker requests.
+ */
+const WIDGET_BROWSER_MAX_AGE_SECONDS = 300;
+
+function browserMaxAge(output: OutputWithChannels): number {
+  const interval = Math.max(60, output.refresh_minutes * 60);
+  return output.format === 'widget' ? Math.min(interval, WIDGET_BROWSER_MAX_AGE_SECONDS) : interval;
+}
 
 export interface FeedResponseOptions {
   /** Records the poll without adding latency to the response. */
@@ -262,7 +309,7 @@ export async function respondWithFeed(
   const etag = await etagFor(result.body);
   const headers: Record<string, string> = {
     'Content-Type': CONTENT_TYPES[output.format] ?? CONTENT_TYPES.ics,
-    'Cache-Control': `public, max-age=${Math.max(60, output.refresh_minutes * 60)}`,
+    'Cache-Control': `public, max-age=${browserMaxAge(output)}`,
     ETag: etag,
     // The feed is a private URL; keep it out of search engines and referrers.
     'X-Robots-Tag': 'noindex, nofollow',

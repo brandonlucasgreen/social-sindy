@@ -193,4 +193,15 @@ describe('widget style', () => {
     expect(snippet).toContain('height:500px');
     expect(snippet).toContain('title="A &quot;quoted&quot; title"');
   });
+
+  // A browser paints an opaque canvas behind an iframe whose element and page
+  // disagree on color-scheme, which turned "transparent" into solid white.
+  it('declares the same color-scheme on the iframe and the widget page', () => {
+    for (const theme of ['auto', 'light', 'dark'] as const) {
+      const style = { ...DEFAULT_WIDGET_STYLE, theme, transparent: true };
+      const scheme = theme === 'auto' ? 'light dark' : theme;
+      expect(embedSnippet('https://socialsindy.com', 'tok', 'W', style)).toContain(`color-scheme:${scheme};`);
+      expect(generateWidget([], channels, options({ style }))).toContain(`color-scheme:${scheme};`);
+    }
+  });
 });

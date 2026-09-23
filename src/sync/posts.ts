@@ -37,6 +37,11 @@ function cacheKey(output: OutputWithChannels): string {
   return `posts:${output.id}:${output.updated_at}`;
 }
 
+/** Drops the cached posts, so the next read goes to Buffer. For manual refresh. */
+export async function invalidatePosts(env: Env, output: OutputWithChannels): Promise<void> {
+  await env.FEED_CACHE.delete(cacheKey(output));
+}
+
 export function windowFor(output: OutputWithChannels, now: Date): { start: Date; end: Date } {
   return {
     start: new Date(now.getTime() - output.window_past_days * 86_400_000),
