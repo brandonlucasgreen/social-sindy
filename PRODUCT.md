@@ -1,16 +1,16 @@
 # Social Sindy — Product
 
-Turns your Buffer publishing schedule and history into subscribable feeds — calendar feeds (ICS) and content feeds (Atom/RSS) — from a single OAuth connection.
+Turns your Buffer posts into feeds: embeddable website widgets, content feeds (Atom/RSS), and calendar feeds (ICS), all from a single OAuth connection.
 
 ## What it does
 
-You connect Buffer once. Then you create "sindies" — each sindy is either a calendar feed (ICS) that you subscribe to in Google Calendar, Apple Calendar, or Outlook, or a content feed (Atom/RSS) that you subscribe to in any RSS reader. Each sindy has its own channel selection, settings, and share URL. (`outputs` is the internal name, in the database table and route module; "sindy" is what the user sees.)
+You connect Buffer once. Then you create "sindies" — each sindy is a widget you embed on your website, a content feed (Atom/RSS) that you subscribe to in any RSS reader, or a calendar feed (ICS) that you subscribe to in Google Calendar, Apple Calendar, or Outlook. Each sindy has its own channel selection, settings, and share URL. (`outputs` is the internal name, in the database table and route module; "sindy" is what the user sees.)
 
 For ICS sindies, there's an optional Google Calendar push: instead of waiting for Google to re-fetch the ICS feed (which it does on its own 8–24 hour schedule), events are written directly into a dedicated Google calendar via the API. Changes appear within minutes. **This is built but currently disabled in the deployed app**, pending Google OAuth verification — see the section below.
 
 ## Who it's for
 
-People who publish through Buffer and want their schedule and publishing history visible in the tools they already live in — their calendar, their RSS reader, their blog's feed — without manually copying things around.
+People who publish through Buffer and want their posts to show up in the places they already live, without copying anything around. That means their website or link-in-bio page, their RSS reader or newsletter tool, and their calendar.
 
 ## Principles
 
@@ -19,7 +19,7 @@ People who publish through Buffer and want their schedule and publishing history
 - **Least privilege.** Buffer OAuth asks for `account:read`, `posts:read`, and `offline_access` only. Google OAuth asks for `calendar.app.created` only — it cannot see or touch existing calendars. The pasted-API-key path has been removed from the UI, because a personal key grants full account access including publishing; signing in with OAuth deletes any key an account still had stored.
 - **Stale > empty.** A transient Buffer failure serves the last successful render rather than an empty feed, which clients would interpret as every event having been deleted.
 - **Never publishes.** No post is created, edited, or deleted in the user's Buffer account. The tool is read-only.
-- **One connection, multiple sindies.** A single Buffer OAuth connection can produce both ICS and Atom feeds. The user doesn't sign in twice or manage separate credentials.
+- **One connection, multiple sindies.** A single Buffer OAuth connection can produce widgets, Atom feeds, and ICS feeds. The user doesn't sign in twice or manage separate credentials.
 
 ## Formats
 

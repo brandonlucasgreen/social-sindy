@@ -1,20 +1,20 @@
 /**
- * THESIS: This surface owns "your posts, everywhere, in feeds you subscribe to."
- * It leads with the artifact itself — a sample week of posts as network-tinted
- * chips — and connects Buffer to get a real one. One connection produces both
- * calendar (ICS) and content (Atom/RSS) feeds.
+ * THESIS: This surface owns "your social posts, now as feeds": one Buffer
+ * connection, three formats. It leads with the artifacts themselves: sample
+ * posts rendered as an embeddable widget (the lead panel), a content feed, and
+ * a calendar. Then it connects Buffer to get real ones.
  *
  * OWN-WORLD: Steel blue ground with blue accent, sharing Buffer's structural
  * language (pill geometry, offset depth, SN Pro) in a warm colour family. The
  * broadcast-signal icon says "syndication" where cally's calendar pegs said
  * "schedule."
  *
- * STORY: A cold visitor sees their own posting week rendered as feed items,
- * understands this is read-only, and connects Buffer.
+ * STORY: A cold visitor sees their own posts on a website, in a reader, and on
+ * a calendar, understands this is read-only, and connects Buffer.
  *
- * FIRST VIEWPORT: Large regular-weight headline; beneath it a live week strip
- * of network-coloured post chips; then a pill button to connect Buffer; then
- * what it can and cannot see.
+ * FIRST VIEWPORT: Large regular-weight headline; beneath it the three-format
+ * showcase, widget largest; then a pill button to connect Buffer; then what it
+ * can and cannot see.
  */
 
 import type { FC, PropsWithChildren } from 'hono/jsx';
@@ -417,8 +417,8 @@ input[type=color] {
 
 /* --- hero demo ---------------------------------------------------------- */
 
-/* Shows the actual output rather than describing it: a week of post chips in
-   network colours. Illustrative sample content, not real account data. */
+/* Shows the actual output rather than describing it: the same sample posts as a
+   widget, a feed, and a calendar. Illustrative content, not real account data. */
 .demo {
   background: var(--raised);
   border: 1px solid var(--border-soft);
@@ -429,21 +429,60 @@ input[type=color] {
      the text column it should align with. */
   margin: 0 0 2.5rem;
 }
-.demo-head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 0.75rem; margin-bottom: 0.875rem; padding-inline: 0.125rem;
+/* The widget leads and is the widest panel; the feed and calendar sit beside it,
+   smaller but fully legible, so no format disappears. On a phone the three
+   stack in the same order. */
+.showcase {
+  display: grid; gap: 0.875rem;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
 }
-.demo-head b { font-size: 0.875rem; font-weight: 600; letter-spacing: -0.005em; }
-.demo-head span { font-size: 0.8125rem; color: var(--text-dim); }
+.showcase > figcaption { grid-column: 1 / -1; margin: 0; }
+.show-side { display: flex; flex-direction: column; gap: 0.875rem; min-width: 0; }
+.show-panel, .show-widget { background: var(--sunken); border-radius: var(--radius-sm); padding: 0.75rem; }
+.show-widget { display: flex; flex-direction: column; min-width: 0; }
+.show-label {
+  display: flex; align-items: baseline; gap: 0.4375rem; flex-wrap: wrap;
+  margin: 0 0 0.5rem; padding-inline: 0.125rem;
+}
+.show-label b { font-size: 0.8125rem; font-weight: 600; }
+.show-label span { font-size: 0.75rem; color: var(--text-dim); }
 
-.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.25rem; }
-.day { display: flex; flex-direction: column; gap: 0.25rem; min-height: 5.5rem; }
-.day > b {
-  font-size: 0.75rem; font-weight: 500; color: var(--text-dim);
-  text-align: center; padding-block: 0.1875rem;
+/* A faithful miniature of the real widget page (src/widget/generate.ts). */
+.w-frame { flex: 1; display: flex; flex-direction: column; gap: 0.5rem; }
+.w-head { font-weight: 600; font-size: 0.875rem; padding: 0 0.125rem; }
+.w-post {
+  background: var(--raised); border: 1px solid var(--border-soft);
+  border-radius: 0.75rem; padding: 0.625rem 0.75rem;
 }
-.day.today { background: var(--sunken); border-radius: var(--radius-sm); }
-.day.today > b { color: var(--text); font-weight: 600; }
+.w-post header {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;
+  font-size: 0.6875rem; color: var(--text-dim); margin-bottom: 0.25rem;
+}
+.w-ch { color: var(--text); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-net { color: var(--text-dim); font-weight: 400; }
+.w-dot {
+  display: inline-block; width: 0.45rem; height: 0.45rem; border-radius: 50%;
+  background: var(--net); margin-right: 0.3rem; vertical-align: 0.05em;
+  /* Some networks are pure black, which vanishes on a dark card without it. */
+  box-shadow: 0 0 0 1px var(--border);
+}
+.w-post p { font-size: 0.8125rem; line-height: 1.45; margin: 0; }
+.w-view { display: inline-block; margin-top: 0.375rem; font-size: 0.6875rem; font-weight: 600; color: var(--link); }
+
+.f-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.375rem; }
+.f-list li {
+  display: flex; flex-direction: column; min-width: 0;
+  padding: 0.375rem 0.5rem; border-radius: 0.375rem; background: var(--raised);
+  border-left: 3px solid var(--net);
+}
+.f-title { font-size: 0.75rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.f-list small { font-size: 0.6875rem; }
+
+.agenda { display: flex; flex-direction: column; gap: 0.3125rem; }
+.a-row { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.a-row > b { font-size: 0.6875rem; font-weight: 500; color: var(--text-dim); width: 1.75rem; flex: none; }
+.a-row.today > b { color: var(--text); font-weight: 600; }
+.a-row > .chip { flex: 1 1 auto; }
 
 /* Rendered the way a calendar renders an event: a block tinted from the
    network's own colour, with a solid dot so the hue is never the only signal. */
@@ -463,20 +502,26 @@ input[type=color] {
 }
 .chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Seven columns on a phone leaves ~40px per day, too narrow for any legible
-   label. Below that, the week becomes a readable day-by-day list instead of
-   colour-only bars. */
 @media (max-width: 36rem) {
-  .week { grid-template-columns: 1fr; gap: 0.375rem; }
-  .day {
-    flex-direction: row; align-items: center; gap: 0.5rem;
-    min-height: 0; padding: 0.25rem 0.375rem;
-  }
-  .day > b { text-align: left; width: 2.25rem; flex: none; }
-  .day:not(.today) { border-bottom: 1px solid var(--border-soft); }
-  .day > .chip { flex: 1 1 auto; }
-  .day:has(> b:only-child) { display: none; }
+  .showcase { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* --- format overview ---------------------------------------------------- */
+
+.formats { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
+.format {
+  background: var(--raised); border: 1px solid var(--border); border-radius: 0.625rem;
+  padding: 1.125rem 1rem; display: flex; flex-direction: column;
+}
+.format-name {
+  align-self: flex-start; font-size: 0.75rem; font-weight: 600; color: var(--link);
+  background: var(--sunken); border-radius: var(--pill); padding: 0.125rem 0.5rem; margin-bottom: 0.625rem;
+}
+.format h3 { font-size: 0.9375rem; margin-bottom: 0.375rem; }
+.format p { font-size: 0.8125rem; line-height: 1.5; color: var(--text-dim); }
+.format dl { margin: auto 0 0; font-size: 0.75rem; line-height: 1.4; }
+.format dt { font-weight: 600; margin-top: 0.375rem; }
+.format dd { margin: 0; color: var(--text-dim); }
 
 /* --- use cases ---------------------------------------------------------- */
 

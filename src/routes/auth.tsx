@@ -55,43 +55,128 @@ export const authRoutes = new Hono<AppBindings>();
 const STATE_TTL_SECONDS = 600;
 
 /**
- * Illustrative sample content for the hero, not real account data. It exists to
- * show the actual output - network-coloured post chips laid across a week -
- * rather than describe it in prose.
+ * Illustrative sample content for the hero, not real account data. It shows
+ * what each format actually produces instead of describing it in prose, and
+ * every panel is labelled as an example.
  */
-const SAMPLE_WEEK: { day: string; today?: boolean; posts: { service: string; text: string }[] }[] = [
-  { day: 'Mon', posts: [{ service: 'linkedin', text: 'Closing the laptop' }] },
-  { day: 'Tue', posts: [{ service: 'threads', text: 'Booze cruise idea' }, { service: 'bluesky', text: 'What are you...' }] },
-  { day: 'Wed', today: true, posts: [{ service: 'instagram', text: '$0.003 a stream' }] },
-  { day: 'Thu', posts: [{ service: 'mastodon', text: 'Buy direct' }] },
-  { day: 'Fri', posts: [{ service: 'threads', text: 'Friday links' }, { service: 'youtube', text: 'New demo' }] },
-  { day: 'Sat', posts: [] },
-  { day: 'Sun', posts: [{ service: 'pinterest', text: 'Sleeve art' }] },
+const SAMPLE_POSTS: { service: string; channel: string; date: string; text: string }[] = [
+  {
+    service: 'threads',
+    channel: 'cultoflightbulbs',
+    date: 'Sep 23',
+    text: 'New single out Friday. Buy it direct and the whole $1 goes to the band, not $0.003 a stream.',
+  },
+  {
+    service: 'bluesky',
+    channel: 'cultoflightbulbs',
+    date: 'Sep 21',
+    text: 'What are you listening to this week? Leaving a playlist in the replies.',
+  },
+];
+
+const SAMPLE_FEED: { service: string; title: string; when: string }[] = [
+  { service: 'threads', title: 'New single out Friday. Buy it direct…', when: '2h ago' },
+  { service: 'bluesky', title: 'What are you listening to this week?', when: '2d ago' },
+  { service: 'linkedin', title: 'Closing the laptop for the week', when: '4d ago' },
+];
+
+const SAMPLE_AGENDA: { day: string; today?: boolean; service: string; text: string }[] = [
+  { day: 'Wed', today: true, service: 'instagram', text: '$0.003 a stream' },
+  { day: 'Thu', service: 'mastodon', text: 'Buy direct' },
+  { day: 'Fri', service: 'youtube', text: 'New demo' },
 ];
 
 const HeroDemo = () => (
-  <figure class="demo">
-    <div class="demo-head">
-      <b>Buffer - Cult of Lightbulbs</b>
-      <span>This week</span>
+  <figure class="demo showcase">
+    <div class="show-widget">
+      <div class="show-label">
+        <b>Widget</b>
+        <span>on your website</span>
+      </div>
+      <div class="w-frame">
+        <div class="w-head">Latest posts</div>
+        {SAMPLE_POSTS.map((post) => (
+          <article class="w-post" style={`--net:${serviceColor(post.service)}`}>
+            <header>
+              <span class="w-ch">
+                <span class="w-dot" aria-hidden="true" />
+                {post.channel}
+                <span class="w-net"> · {serviceLabel(post.service)}</span>
+              </span>
+              <span>{post.date}</span>
+            </header>
+            <p>{post.text}</p>
+            <span class="w-view">View on {serviceLabel(post.service)} →</span>
+          </article>
+        ))}
+      </div>
     </div>
-    <div class="week">
-      {SAMPLE_WEEK.map((day) => (
-        <div class={day.today ? 'day today' : 'day'}>
-          <b>{day.day}</b>
-          {day.posts.map((post) => (
-            <div class="chip" style={`--net:${serviceColor(post.service)}`}>
-              <span title={`${serviceLabel(post.service)} - ${post.text}`}>{post.text}</span>
+
+    <div class="show-side">
+      <div class="show-panel">
+        <div class="show-label">
+          <b>Feed</b>
+          <span>in your reader or newsletter</span>
+        </div>
+        <ul class="f-list">
+          {SAMPLE_FEED.map((entry) => (
+            <li style={`--net:${serviceColor(entry.service)}`}>
+              <span class="f-title">{entry.title}</span>
+              <small>
+                {serviceLabel(entry.service)} · {entry.when}
+              </small>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div class="show-panel">
+        <div class="show-label">
+          <b>Calendar</b>
+          <span>for you and your team</span>
+        </div>
+        <div class="agenda">
+          {SAMPLE_AGENDA.map((row) => (
+            <div class={row.today ? 'a-row today' : 'a-row'}>
+              <b>{row.day}</b>
+              <div class="chip" style={`--net:${serviceColor(row.service)}`}>
+                <span title={`${serviceLabel(row.service)} - ${row.text}`}>{row.text}</span>
+              </div>
             </div>
           ))}
         </div>
-      ))}
+      </div>
     </div>
-    <figcaption class="small" style="margin-top:0.75rem">
-      Example of the result. Each scheduled post becomes an event, colored by network.
+
+    <figcaption class="small">
+      Example output: recent posts as a widget and a feed, upcoming ones on a calendar.
     </figcaption>
   </figure>
 );
+
+const FORMATS_OVERVIEW: { name: string; job: string; body: string; posts: string; worksWith: string }[] = [
+  {
+    name: 'Widget',
+    job: 'Show your posts on your site',
+    body: 'One embed with every channel in it, in place of a separate widget for each network. Match it to your site with your own colors, font, and size.',
+    posts: 'Published posts only, because the embed is public',
+    worksWith: 'Any site that accepts HTML, including link-in-bio pages',
+  },
+  {
+    name: 'Feed (Atom/RSS)',
+    job: 'Send your posts onward',
+    body: 'Every post becomes a feed entry with its full text, links, and media. Turn it into a newsletter, an archive, or a trigger for any automation.',
+    posts: 'Published posts, plus drafts if you want them',
+    worksWith: 'Reeder, NetNewsWire, Buttondown, Mailchimp, Zapier',
+  },
+  {
+    name: 'Calendar (ICS)',
+    job: 'See what is coming up',
+    body: 'Your schedule shows up in the calendar you already use, so the whole team can see what is going out without logging into Buffer.',
+    posts: 'Scheduled and published posts, with drafts if you want them',
+    worksWith: 'Google Calendar, Apple Calendar, Outlook',
+  },
+];
 
 /**
  * The homepage doubles as the connect page, so it is both the marketing surface
@@ -99,21 +184,21 @@ const HeroDemo = () => (
  * this file renders is not.
  */
 const HOME_DESCRIPTION =
-  'Turn your Buffer publishing schedule into feeds you can subscribe to: a calendar feed (ICS) for Google Calendar, Apple Calendar, or Outlook, and a content feed (Atom/RSS) for your blog or reader. One read-only connection, both formats.';
+  'Turn your Buffer posts into an embeddable website widget, an Atom/RSS feed for your reader or newsletter, and a calendar feed for Google Calendar, Apple Calendar, or Outlook. One read-only connection, all three formats.';
 
 function ConnectPage({ error, origin }: { error?: string; origin: string }) {
   return (
     <Layout
-      title="social sindy - your Buffer queue as feeds"
+      title="social sindy - your Buffer posts as widgets, feeds, and calendars"
       description={HOME_DESCRIPTION}
       canonical={`${origin}/`}
       indexable
     >
-      <h1>Your content schedule, as feeds you actually subscribe to.</h1>
+      <h1>Your social posts, now as feeds.</h1>
       <p class="lede">
-        Connect Buffer, choose your channels, and get a calendar feed (ICS) for Google Calendar,
-        Apple Calendar, or Outlook - plus a content feed (Atom/RSS) for your blog or RSS reader.
-        One connection, both formats.
+        Connect Buffer once and put your posts where they're useful: a widget on your website, a
+        feed for your reader or newsletter, and a calendar your team can check. Read-only, with
+        nothing to install.
       </p>
 
       <HeroDemo />
@@ -130,12 +215,29 @@ function ConnectPage({ error, origin }: { error?: string; origin: string }) {
         posts. Signing in also creates your account here - there is nothing separate to set up.
       </small>
 
-      <h2>What can you use it for?</h2>
+      <h2>Pick a format, or use all three</h2>
+      <div class="formats">
+        {FORMATS_OVERVIEW.map((format) => (
+          <div class="format">
+            <span class="format-name">{format.name}</span>
+            <h3>{format.job}</h3>
+            <p>{format.body}</p>
+            <dl>
+              <dt>Shows</dt>
+              <dd>{format.posts}</dd>
+              <dt>Works with</dt>
+              <dd>{format.worksWith}</dd>
+            </dl>
+          </div>
+        ))}
+      </div>
+
+      <h2>What might you use it for?</h2>
       <div class="use-cases">
         <div class="use-case">
-          <div class="use-case-icon">📅</div>
-          <h3>Team calendar</h3>
-          <p>Add your content schedule to a shared Google Calendar or Outlook so the whole team can see what's coming up - without logging into Buffer.</p>
+          <div class="use-case-icon">🌐</div>
+          <h3>Link-in-bio page</h3>
+          <p>Show your latest posts from every network on your own page, updated automatically whenever you publish.</p>
         </div>
         <div class="use-case">
           <div class="use-case-icon">✉️</div>
@@ -143,24 +245,24 @@ function ConnectPage({ error, origin }: { error?: string; origin: string }) {
           <p>Pipe the feed into Buttondown, Mailchimp, or FeedMail and every post becomes an email send. No manual work.</p>
         </div>
         <div class="use-case">
+          <div class="use-case-icon">📅</div>
+          <h3>Team calendar</h3>
+          <p>Add your content schedule to a shared Google Calendar or Outlook so the whole team can see what's coming up, without logging into Buffer.</p>
+        </div>
+        <div class="use-case">
+          <div class="use-case-icon">🗂️</div>
+          <h3>Content archive</h3>
+          <p>Keep a record of everything you've posted in your reader, so it stays around even if a platform changes or disappears.</p>
+        </div>
+        <div class="use-case">
           <div class="use-case-icon">📖</div>
           <h3>Personal journal</h3>
           <p>Subscribe in Reeder, NetNewsWire, or your favorite RSS app and revisit your posts in a clean, reader-like view.</p>
         </div>
         <div class="use-case">
-          <div class="use-case-icon">🌐</div>
-          <h3>Website widget</h3>
-          <p>Embed a cross-network feed on your site - every channel in one place, not separate widgets for each social network.</p>
-        </div>
-        <div class="use-case">
-          <div class="use-case-icon">🗂️</div>
-          <h3>Content archive</h3>
-          <p>A searchable record of everything you've posted, always available even if a platform changes or disappears.</p>
-        </div>
-        <div class="use-case">
           <div class="use-case-icon">🔗</div>
           <h3>Anything that reads a feed</h3>
-          <p>ICS and Atom are open standards - any tool that accepts a calendar URL or RSS URL just works. The possibilities are wide open.</p>
+          <p>ICS and Atom are open standards, so any tool that accepts a calendar URL or an RSS URL just works.</p>
         </div>
       </div>
 
@@ -171,9 +273,18 @@ function ConnectPage({ error, origin }: { error?: string; origin: string }) {
             <span class="tick" aria-hidden="true">
               ✓
             </span>
-            Reads your schedule
+            Reads your posts
           </h3>
-          <p>Your account, channel list, and scheduled posts. Nothing else.</p>
+          <p>Your account, channel list, and posts. Nothing else.</p>
+        </div>
+        <div>
+          <h3>
+            <span class="tick" aria-hidden="true">
+              ✓
+            </span>
+            Public only when you choose
+          </h3>
+          <p>Calendar and feed URLs are private. Widgets are public, so they only ever show posts that are already published.</p>
         </div>
         <div>
           <h3>

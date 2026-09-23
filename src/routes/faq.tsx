@@ -15,15 +15,15 @@ faqRoutes.use('*', withUser);
 const FAQ = [
   {
     q: 'What does it do?',
-    a: `Connect your Buffer account, pick your channels, and get a private URL. Subscribe to it in your calendar app (ICS) or RSS reader (Atom) — your posts show up automatically, updated in the background.`,
+    a: `Connect your Buffer account, pick your channels, and choose a format: a widget you embed on your website, a content feed (Atom/RSS) for your reader or newsletter tool, or a calendar feed (ICS) for Google Calendar, Apple Calendar, or Outlook. Your posts show up automatically and stay up to date.`,
   },
   {
     q: 'Does it have access to my whole Buffer account?',
     a: `Only your channels and your scheduled or published posts. Nothing else — no analytics, no comments, no DMs. And the OAuth scope is read-only, so it can never post on your behalf.`,
   },
   {
-    q: "What's the difference between ICS and Atom?",
-    a: `ICS is for calendars — each post becomes a timed event with a start time and duration. Atom is for feeds — each post becomes an entry with the full text and links, readable in any RSS app or email tool. You can create both from the same Buffer connection.`,
+    q: "What's the difference between the formats?",
+    a: `A widget shows your latest published posts on a web page. Atom is a feed: each post becomes an entry with the full text and links, readable in any RSS app or email tool. ICS is for calendars: each post becomes a timed event, so you can see your schedule. You can create all three from the same Buffer connection.`,
   },
   {
     q: 'Can I show my posts on my own website?',
@@ -35,7 +35,7 @@ const FAQ = [
   },
   {
     q: 'Is the feed URL private?',
-    a: `Yes. Anyone with the URL can read the feed, so keep it to yourself. You can generate a new URL at any time, which immediately invalidates the old one.`,
+    a: `Calendar and feed URLs are. Anyone with one can read it, so keep it to yourself. Widgets are the exception: their embed code is meant to be public, so they only ever show posts that are already published. You can replace any URL at any time, which immediately stops the old one working.`,
   },
   {
     q: 'Can I delete my account?',
@@ -52,7 +52,7 @@ faqRoutes.get('/faq', (c) => {
   return c.html(
     <Layout
       title="FAQ — social sindy"
-      description="How social sindy works: what it reads from Buffer, the difference between the ICS calendar feed and the Atom/RSS content feed, how often feeds refresh, and how to keep a feed URL private."
+      description="How social sindy works: what it reads from Buffer, the difference between the website widget, the Atom/RSS content feed, and the ICS calendar feed, how often they refresh, and which URLs are private."
       canonical={`${appOrigin(c.env)}/faq`}
       indexable
       user={user}
