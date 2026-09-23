@@ -129,3 +129,69 @@ describe('security headers', () => {
     expect(response.headers.get('strict-transport-security')).toContain('max-age=31536000');
   });
 });
+
+describe('embeddable widget', () => {
+  const WIDGET_BODY = '<!doctype html><html><body>widget</body></html>';
+
+  /** D1 stand-in that resolves any token to one output of the given format. */
+  function envWith(format: 'ics' | 'atom' | 'widget') {
+    const row = {
+      id: 'out_1',
+      user_id: 'usr_1',
+      format,
+      feed_token: 'tok',
+      refresh_minutes: 60,
+      updated_at: '2026-07-01T00:00:00.000Z',
+      widget_style: null,
+    };
+    const statement = {
+      bind: () => statement,
+      first: async () => row,
+      all: async () => ({ results: [] }),
+      run: async () => ({ success: true }),
+    };
+    return {
+      ...env,
+      DB: { prepare: () => statement, batch: async () => [] },
+      // Every fresh-cache lookup hits, so no Buffer call is ever attempted.
+      FEED_CACHE: { get: async () => WIDGET_BODY, put: async () => {} },
+    };
+  }
+
+  async function embed(format: 'ics' | 'atom' | 'widget', path = '/embed/tok') {
+    return worker.fetch(request(`${ORIGIN}${path}`), envWith(format) as never, ctx);
+  }
+
+  it('serves a widget as frameable HTML with a script-free policy', async () => {
+    const response = await embed('widget');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/html');
+    expect(await response.text()).toBe(WIDGET_BODY);
+
+    expect(response.headers.get('x-frame-options')).toBeNull();
+    const csp = response.headers.get('content-security-policy') ?? '';
+    expect(csp).toContain('frame-ancestors *');
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).not.toContain('script-src');
+    expect(response.headers.get('cross-origin-resource-policy')).toBe('cross-origin');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+  });
+
+  it.each(['ics', 'atom'] as const)(
+    'refuses to render a %s token — private feeds must never be frameable',
+    async (format) => {
+      const response = await embed(format);
+      expect(response.status).toBe(404);
+    },
+  );
+
+  it('does not serve a widget token from the feed route', async () => {
+    const response = await embed('widget', '/feed/tok.xml');
+    expect(response.status).toBe(404);
+  });
+
+  it('keeps the app itself unframeable', async () => {
+    const response = await fetch(`${ORIGIN}/faq`);
+    expect(response.headers.get('x-frame-options')).toBe('DENY');
+  });
+});

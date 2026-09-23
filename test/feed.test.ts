@@ -52,6 +52,7 @@ function output(overrides: Partial<OutputWithChannels> = {}): OutputWithChannels
     show_channel_in_title: 1,
     max_items: 50,
     group_cross_posts: 1,
+    widget_style: null,
     created_at: '2026-07-01T00:00:00.000Z',
     updated_at: '2026-07-01T00:00:00.000Z',
     last_polled_at: null,

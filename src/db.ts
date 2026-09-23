@@ -3,7 +3,7 @@
  * and the query shapes matter for a Worker's latency budget.
  *
  * Unified around the `outputs` table: one Buffer org + channel selection → one
- * feed URL, in either ICS or Atom format.
+ * feed URL, in ICS, Atom, or embeddable-widget format.
  */
 
 import { randomId, randomToken } from './crypto.js';
@@ -26,7 +26,11 @@ export interface CredentialRow {
   fingerprint: string;
 }
 
-export type OutputFormat = 'ics' | 'atom';
+export type OutputFormat = 'ics' | 'atom' | 'widget';
+
+export function isOutputFormat(value: string): value is OutputFormat {
+  return value === 'ics' || value === 'atom' || value === 'widget';
+}
 
 export interface OutputRow {
   id: string;
@@ -39,9 +43,11 @@ export interface OutputRow {
   // ICS-specific
   event_duration_minutes: number;
   show_channel_in_title: number;
-  // Atom-specific
+  // Atom and widget
   max_items: number;
   group_cross_posts: number;
+  // Widget-specific: JSON, validated on read by parseWidgetStyle
+  widget_style: string | null;
   // Shared
   refresh_minutes: number;
   window_past_days: number;
@@ -459,9 +465,11 @@ export interface CreateOutputInput {
   // ICS-specific
   eventDurationMinutes: number;
   showChannelInTitle: boolean;
-  // Atom-specific
+  // Atom and widget
   maxItems: number;
   groupCrossPosts: boolean;
+  // Widget-specific, serialized; null for other formats
+  widgetStyle: string | null;
   // Shared
   refreshMinutes: number;
   windowPastDays: number;
@@ -485,9 +493,9 @@ export async function createOutput(
         `INSERT INTO outputs (
            id, user_id, organization_id, organization_name, name, format, feed_token,
            event_duration_minutes, show_channel_in_title, max_items, group_cross_posts,
-           refresh_minutes, window_past_days, window_future_days, statuses,
+           widget_style, refresh_minutes, window_past_days, window_future_days, statuses,
            created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -501,6 +509,7 @@ export async function createOutput(
         input.showChannelInTitle ? 1 : 0,
         input.maxItems,
         input.groupCrossPosts ? 1 : 0,
+        input.widgetStyle,
         input.refreshMinutes,
         input.windowPastDays,
         input.windowFutureDays,
@@ -608,9 +617,11 @@ export interface UpdateOutputInput {
   // ICS-specific
   eventDurationMinutes: number;
   showChannelInTitle: boolean;
-  // Atom-specific
+  // Atom and widget
   maxItems: number;
   groupCrossPosts: boolean;
+  // Widget-specific, serialized; null for other formats
+  widgetStyle: string | null;
   // Shared
   refreshMinutes: number;
   windowPastDays: number;
@@ -628,7 +639,7 @@ export async function updateOutput(
       .prepare(
         `UPDATE outputs SET
            name = ?, event_duration_minutes = ?, show_channel_in_title = ?,
-           max_items = ?, group_cross_posts = ?,
+           max_items = ?, group_cross_posts = ?, widget_style = ?,
            refresh_minutes = ?, window_past_days = ?, window_future_days = ?,
            statuses = ?, updated_at = ?
          WHERE id = ?`,
@@ -639,6 +650,7 @@ export async function updateOutput(
         input.showChannelInTitle ? 1 : 0,
         input.maxItems,
         input.groupCrossPosts ? 1 : 0,
+        input.widgetStyle,
         input.refreshMinutes,
         input.windowPastDays,
         input.windowFutureDays,

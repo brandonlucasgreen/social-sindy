@@ -50,7 +50,7 @@ export interface AtomFeedOptions {
  * same content cross-posted. Each group becomes one entry with multiple
  * channel tags.
  */
-function groupPosts(posts: BufferPost[]): Map<string, BufferPost[]> {
+export function groupPosts(posts: BufferPost[]): Map<string, BufferPost[]> {
   const groups = new Map<string, BufferPost[]>();
   for (const post of posts) {
     // Group by normalized text content + same day (catches edits)

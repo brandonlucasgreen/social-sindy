@@ -44,6 +44,16 @@ export function windowFor(output: OutputWithChannels, now: Date): { start: Date;
   };
 }
 
+/**
+ * Posts to request for a widget: its card count, times the channel count when
+ * cross-posts are grouped (a post sent to three channels is three Buffer posts
+ * but one card), capped at a single page.
+ */
+export function widgetFetchLimit(output: OutputWithChannels): number {
+  const perCard = output.group_cross_posts === 1 ? Math.max(1, output.channels.length) : 1;
+  return Math.min(100, output.max_items * perCard);
+}
+
 export async function postsForOutput(
   env: Env,
   output: OutputWithChannels,
@@ -59,15 +69,20 @@ export async function postsForOutput(
   const token = await bufferTokenFor(env, output.user_id);
 
   const { start, end } = windowFor(output, now);
+  const isWidget = output.format === 'widget';
   const { posts, rateLimit, truncated } = await new BufferClient(token).fetchPosts({
     organizationId: output.organization_id,
     channelIds: output.channels.map((channel) => channel.channel_id),
     statuses: parseStatuses(output.statuses),
     start,
     end,
+    // A widget shows the latest N posts, so it asks for exactly those. The
+    // over-fetch leaves room for cross-posts that group into a single card.
+    ...(isWidget ? { direction: 'desc' as const, limit: widgetFetchLimit(output) } : {}),
   });
 
-  // Apply max_items cap for Atom outputs
+  // Apply max_items cap for Atom outputs. Widgets are capped at render time
+  // instead, after cross-posts are grouped, so grouping never costs a card.
   let finalPosts = posts;
   let finalTruncated = truncated;
   if (output.format === 'atom' && output.max_items > 0 && finalPosts.length > output.max_items) {
