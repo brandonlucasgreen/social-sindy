@@ -975,6 +975,11 @@ const WidgetEmbedPanels: FC<{ output: OutputWithChannels; baseUrl: string }> = (
           </button>
         </div>
         <p class="small">
+          The widget fades in once it has loaded, rather than showing an empty box first. If it
+          never appears, your site's Content Security Policy probably blocks inline scripts: delete
+          <code>opacity:0;</code> and the <code>onload</code> attribute from the code above.
+        </p>
+        <p class="small">
           Only takes a link? Use the widget URL on its own:
         </p>
         <div class="url">
