@@ -187,6 +187,111 @@ describe('cachedFeed', () => {
   });
 });
 
+describe('cachedFeed for a widget', () => {
+  const FRESH = 'feed:fresh:out_1:2026-07-01T00:00:00.000Z';
+  const WIDGET_A = '<!doctype html><p>a</p>';
+  const WIDGET_B = '<!doctype html><p>b</p>';
+
+  /** Collects what the route would hand to executionCtx.waitUntil. */
+  function background() {
+    const pending: Promise<unknown>[] = [];
+    return {
+      waitUntil: (promise: Promise<unknown>) => void pending.push(promise),
+      settle: () => Promise.all(pending),
+      pending,
+    };
+  }
+
+  it('serves the previous render at once and refreshes after responding', async () => {
+    // The visitor must not wait on Buffer: that wait is a blank box on the
+    // host's page.
+    const kv = fakeKv();
+    const out = output({ format: 'widget' });
+    await cachedFeed(env(kv.namespace), out, async () => WIDGET_A);
+    kv.store.delete(FRESH);
+
+    let finishRender!: (body: string) => void;
+    const render = vi.fn(() => new Promise<string>((resolve) => (finishRender = resolve)));
+    const bg = background();
+
+    const result = await cachedFeed(env(kv.namespace), out, render, bg);
+
+    expect(result).toMatchObject({ body: WIDGET_A, cached: true, stale: false });
+    expect(bg.pending).toHaveLength(1);
+
+    await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(1));
+    finishRender(WIDGET_B);
+    await bg.settle();
+    expect(kv.store.get(FRESH)?.value).toBe(WIDGET_B);
+  });
+
+  it('starts one background refresh for a burst of visitors', async () => {
+    // Buffer's quota is the reason for the cache; a busy page must not turn one
+    // expiry into a fetch per visitor.
+    const kv = fakeKv();
+    const out = output({ format: 'widget' });
+    await cachedFeed(env(kv.namespace), out, async () => WIDGET_A);
+    kv.store.delete(FRESH);
+
+    let finishRender!: (body: string) => void;
+    const render = vi.fn(() => new Promise<string>((resolve) => (finishRender = resolve)));
+    const bg = background();
+
+    await cachedFeed(env(kv.namespace), out, render, bg);
+    await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(1));
+    for (let i = 0; i < 10; i++) await cachedFeed(env(kv.namespace), out, render, bg);
+    finishRender(WIDGET_B);
+    await bg.settle();
+
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(kv.store.has('feed:refreshing:out_1')).toBe(false);
+  });
+
+  it('renders inline straight after an edit rather than serving the old settings', async () => {
+    const kv = fakeKv();
+    await cachedFeed(env(kv.namespace), output({ format: 'widget' }), async () => WIDGET_A);
+
+    const bg = background();
+    const edited = output({ format: 'widget', updated_at: '2026-07-02T00:00:00.000Z' });
+    const result = await cachedFeed(env(kv.namespace), edited, async () => WIDGET_B, bg);
+
+    expect(result).toMatchObject({ body: WIDGET_B, cached: false });
+    expect(bg.pending).toHaveLength(0);
+  });
+
+  it('keeps serving the previous render when the background refresh fails', async () => {
+    const kv = fakeKv();
+    const out = output({ format: 'widget' });
+    await cachedFeed(env(kv.namespace), out, async () => WIDGET_A);
+    kv.store.delete(FRESH);
+
+    const bg = background();
+    const result = await cachedFeed(env(kv.namespace), out, async () => {
+      throw new Error('Buffer is down');
+    }, bg);
+    await bg.settle();
+
+    expect(result.body).toBe(WIDGET_A);
+    // The fallback is re-cached with a backoff, so the next visitor does not
+    // start another doomed refresh.
+    expect(kv.store.get(FRESH)?.value).toBe(WIDGET_A);
+  });
+
+  it('still renders subscription feeds inline', async () => {
+    // A calendar client is not watching a spinner; it should get current data.
+    const kv = fakeKv();
+    const out = output();
+    await cachedFeed(env(kv.namespace), out, async () => ICS_A);
+    kv.store.delete(FRESH);
+
+    const bg = background();
+    const result = await cachedFeed(env(kv.namespace), out, async () => ICS_B, bg);
+
+    expect(result).toMatchObject({ body: ICS_B, cached: false });
+    expect(bg.pending).toHaveLength(0);
+  });
+});
+
 describe('etagFor', () => {
   it('is stable for identical content and differs otherwise', async () => {
     expect(await etagFor(ICS_A)).toBe(await etagFor(ICS_A));

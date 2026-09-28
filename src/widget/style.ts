@@ -208,14 +208,24 @@ function escapeAttr(text: string): string {
  * The copy-paste snippet. Width and height live on the iframe, not the page
  * inside it: the embedded document is fluid and fills whatever box the host
  * gives it, scrolling internally when there are more posts than fit.
+ *
+ * The iframe starts invisible and fades in once the widget has loaded. Until
+ * then it holds a blank document with no color-scheme, which disagrees with the
+ * one set inline here, so the browser paints it as an opaque white box (the
+ * same mismatch widgetColorScheme exists to avoid, but on a page we do not
+ * control). The box keeps its size while hidden, so nothing shifts when the
+ * widget appears. The cost is an inline handler: a host whose CSP forbids them
+ * would leave the widget invisible, which the dashboard warns about.
  */
 export function embedSnippet(baseUrl: string, token: string, title: string, style: WidgetStyle): string {
   const width = style.width === 0 ? 'width:100%' : `width:100%;max-width:${style.width}px`;
   const css =
     `${width};height:${style.height}px;border:0;color-scheme:${widgetColorScheme(style)};` +
-    (style.transparent ? 'background:transparent;' : '');
+    (style.transparent ? 'background:transparent;' : '') +
+    'opacity:0;transition:opacity .2s;';
   return (
     `<iframe src="${escapeAttr(embedUrl(baseUrl, token))}" title="${escapeAttr(title)}" ` +
-    `style="${css}" loading="lazy"${style.transparent ? ' allowtransparency="true"' : ''}></iframe>`
+    `style="${css}" loading="lazy"${style.transparent ? ' allowtransparency="true"' : ''} ` +
+    `onload="this.style.opacity=1"></iframe>`
   );
 }

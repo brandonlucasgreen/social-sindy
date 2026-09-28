@@ -28,6 +28,13 @@ const LAST_GOOD_TTL_SECONDS = 7 * 86_400;
 /** KV requires at least 60s for expirationTtl. */
 const MIN_KV_TTL_SECONDS = 60;
 
+/**
+ * How long a background widget refresh holds its claim. Long enough to cover a
+ * slow Buffer fetch, so a burst of visitors starts one refresh rather than one
+ * each, and short enough that a refresh that died mid-flight is retried soon.
+ */
+const REFRESH_CLAIM_TTL_SECONDS = 60;
+
 export interface FeedResult {
   body: string;
   /** True when served from cache without contacting Buffer. */
@@ -45,6 +52,20 @@ function freshKey(output: OutputWithChannels): string {
 
 function lastGoodKey(output: OutputWithChannels): string {
   return `feed:last-good:${output.id}`;
+}
+
+/**
+ * The newest render at these exact settings, kept past its fresh TTL so a
+ * widget can be served instantly while it refreshes. Unlike the last-good copy
+ * it is keyed on `updated_at`: straight after an edit the owner must see the
+ * new settings, not a render of the old ones handed out as current.
+ */
+function staleKey(output: OutputWithChannels): string {
+  return `feed:stale:${output.id}:${output.updated_at}`;
+}
+
+function refreshClaimKey(output: OutputWithChannels): string {
+  return `feed:refreshing:${output.id}`;
 }
 
 function channelRefs(output: OutputWithChannels): Map<string, ChannelRef> {
@@ -69,14 +90,23 @@ function itemCount(output: OutputWithChannels, body: string): number {
   return body.split(marker).length - 1;
 }
 
+export interface CacheOptions {
+  /**
+   * Keeps a background refresh alive after the response is sent. Without it a
+   * cache miss always renders inline, which is what a manual refresh needs.
+   */
+  waitUntil?: (promise: Promise<unknown>) => void;
+}
+
 /** Renders the feed for this output, dispatching on its format. */
 export function buildFeed(
   env: Env,
   output: OutputWithChannels,
   now: Date = new Date(),
+  options: CacheOptions = {},
 ): Promise<FeedResult> {
   const renderer = RENDERERS[output.format] ?? renderIcs;
-  return cachedFeed(env, output, () => renderer(env, output, now));
+  return cachedFeed(env, output, () => renderer(env, output, now), options);
 }
 
 /**
@@ -87,15 +117,74 @@ export function buildFeed(
  * reach Buffer (that is what protects the quota from unbounded polling), and a
  * Buffer failure must never surface as an empty feed, which clients would
  * interpret as every event having been deleted.
+ *
+ * A widget whose fresh copy has expired is served its previous render at once
+ * and refreshed in the background. A render waits on Buffer, which can take
+ * seconds, and a widget's visitor watches that wait as a blank box on someone
+ * else's page. Feeds keep rendering inline: a calendar client polls in the
+ * background, so nobody is watching, and it should get current data.
  */
 export async function cachedFeed(
   env: Env,
   output: OutputWithChannels,
   render: () => Promise<string>,
+  options: CacheOptions = {},
 ): Promise<FeedResult> {
   const cached = await env.FEED_CACHE.get(freshKey(output));
   if (cached) return { body: cached, cached: true, stale: false, eventCount: null };
 
+  if (output.format === 'widget' && options.waitUntil) {
+    const previous = await env.FEED_CACHE.get(staleKey(output));
+    if (previous) {
+      options.waitUntil(refreshInBackground(env, output, render));
+      return { body: previous, cached: true, stale: false, eventCount: null };
+    }
+  }
+
+  return renderAndStore(env, output, render);
+}
+
+/**
+ * The widget's background refresh. A claim in KV means a burst of visitors
+ * starts one Buffer fetch, not one each. KV is eventually consistent, so two
+ * visitors a moment apart in different locations can both get past the check.
+ * That is the same race a plain cache miss already has, and it is bounded by
+ * the claim's short TTL.
+ *
+ * The outcome is recorded the way respondWithFeed records an inline render, so
+ * the dashboard's status line still reports when the widget last refreshed.
+ */
+async function refreshInBackground(
+  env: Env,
+  output: OutputWithChannels,
+  render: () => Promise<string>,
+): Promise<void> {
+  const claim = refreshClaimKey(output);
+  if (await env.FEED_CACHE.get(claim)) return;
+  await env.FEED_CACHE.put(claim, '1', { expirationTtl: REFRESH_CLAIM_TTL_SECONDS });
+
+  try {
+    const result = await renderAndStore(env, output, render);
+    await recordPoll(env.DB, output.id, {
+      fetched: true,
+      eventCount: result.eventCount ?? undefined,
+      error: null,
+    });
+  } catch (error) {
+    // The visitor already has the previous render; the owner gets the error.
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    await recordPoll(env.DB, output.id, { fetched: true, error: message });
+  } finally {
+    await env.FEED_CACHE.delete(claim);
+  }
+}
+
+/** Renders, caches the result, and falls back to the last good copy on failure. */
+async function renderAndStore(
+  env: Env,
+  output: OutputWithChannels,
+  render: () => Promise<string>,
+): Promise<FeedResult> {
   try {
     const body = await render();
     const ttl = Math.max(MIN_KV_TTL_SECONDS, output.refresh_minutes * 60);
@@ -103,6 +192,9 @@ export async function cachedFeed(
     await Promise.all([
       env.FEED_CACHE.put(freshKey(output), body, { expirationTtl: ttl }),
       env.FEED_CACHE.put(lastGoodKey(output), body, { expirationTtl: LAST_GOOD_TTL_SECONDS }),
+      ...(output.format === 'widget'
+        ? [env.FEED_CACHE.put(staleKey(output), body, { expirationTtl: LAST_GOOD_TTL_SECONDS })]
+        : []),
     ]);
 
     return { body, cached: false, stale: false, eventCount: itemCount(output, body) };
@@ -255,7 +347,7 @@ function browserMaxAge(output: OutputWithChannels): number {
 }
 
 export interface FeedResponseOptions {
-  /** Records the poll without adding latency to the response. */
+  /** Records the poll, and runs a widget's background refresh, after responding. */
   waitUntil?: (promise: Promise<unknown>) => void;
 }
 
@@ -267,7 +359,7 @@ export async function respondWithFeed(
 ): Promise<Response> {
   let result: FeedResult;
   try {
-    result = await buildFeed(env, output);
+    result = await buildFeed(env, output, new Date(), { waitUntil: options.waitUntil });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     options.waitUntil?.(recordPoll(env.DB, output.id, { fetched: true, error: message }));
