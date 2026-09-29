@@ -16,7 +16,7 @@
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
-    "hono": "^4.13.8"
+    "hono": "^4.13.9"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260926.1",
