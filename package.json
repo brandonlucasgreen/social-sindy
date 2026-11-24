@@ -19,11 +19,11 @@
     "hono": "^4.13.18"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261114.1",
+    "@cloudflare/workers-types": "^5.20261121.1",
     "ical.js": "^2.2.1",
     "typescript": "^7.0.2",
-    "vitest": "^5.1.0",
-    "wrangler": "^4.162.0"
+    "vitest": "^5.1.1",
+    "wrangler": "^4.166.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
